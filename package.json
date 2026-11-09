@@ -1,0 +1,78 @@
+{
+  "name": "jarvis",
+  "productName": "Jarvis",
+  "version": "1.0.0",
+  "description": "Jarvis: asistente personal de escritorio conectado a n8n",
+  "main": "src/main.js",
+  "author": "Ayoub",
+  "license": "UNLICENSED",
+  "private": true,
+  "scripts": {
+    "modelo": "node scripts/preparar-modelo.js",
+    "start": "electron .",
+    "compilar": "npm run modelo && electron-builder --win nsis --x64",
+    "probar-n8n": "node scripts/probar-n8n.js"
+  },
+  "dependencies": {
+    "vosk-browser": "^0.0.8"
+  },
+  "devDependencies": {
+    "adm-zip": "^0.6.1",
+    "electron": "^45.2.3",
+    "electron-builder": "^26.18.0",
+    "tar": "^7.5.22"
+  },
+  "build": {
+    "appId": "com.ayoub.jarvis",
+    "productName": "Jarvis",
+    "copyright": "Ayoub",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "src/**/*",
+      "assets/**/*",
+      "package.json",
+      "!**/*.map"
+    ],
+    "extraResources": [
+      {
+        "from": "config.json",
+        "to": "config.json"
+      },
+      {
+        "from": "modelo",
+        "to": "modelo",
+        "filter": [
+          "modelo-es.tar.gz"
+        ]
+      }
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "assets/icon.ico",
+      "executableName": "Jarvis"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": "always",
+      "createStartMenuShortcut": true,
+      "shortcutName": "Jarvis",
+      "runAfterFinish": true,
+      "deleteAppDataOnUninstall": false,
+      "installerIcon": "assets/icon.ico",
+      "uninstallerIcon": "assets/icon.ico",
+      "uninstallDisplayName": "Jarvis",
+      "artifactName": "Jarvis-Setup-${version}.exe"
+    }
+  }
+}

@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <!-- Política de seguridad: solo recursos propios de la app; nada externo. -->
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval' 'unsafe-eval'; worker-src 'self' blob: data:;
+                 connect-src 'self' jarvis: blob: data:; style-src 'self' 'unsafe-inline'; img-src 'self' data:; media-src 'self' blob:">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Jarvis</title>
+  <link rel="stylesheet" href="estilo.css">
+</head>
+<body>
+  <!-- Fondo animado (rejilla y partículas) -->
+  <canvas id="fondo"></canvas>
+
+  <!-- Barra superior -->
+  <header class="barra">
+    <div class="logo">J.A.R.V.I.S.</div>
+    <div class="estado-red" id="estadoRed" title="Conexión con n8n"><span class="punto"></span><span id="estadoRedTexto">conectando…</span></div>
+    <div class="reloj" id="reloj">--:--</div>
+    <div class="botones">
+      <button id="btnPantalla" title="Pantalla completa (F11)">⛶</button>
+      <button id="btnOcultar" title="Ocultar en la bandeja (Esc)">—</button>
+    </div>
+  </header>
+
+  <!-- Aviso de errores (n8n, micrófono, configuración...) -->
+  <div class="aviso oculto" id="aviso" role="alert">
+    <span id="avisoTexto"></span>
+    <button id="avisoCerrar" title="Cerrar">✕</button>
+  </div>
+
+  <main class="escenario">
+    <!-- Panel izquierdo: conversación -->
+    <section class="panel panel-izq">
+      <h2>CONVERSACIÓN</h2>
+      <div class="chat" id="chat"></div>
+      <form class="entrada" id="formChat" autocomplete="off">
+        <input id="textoChat" type="text" placeholder="Escribe a Jarvis o pulsa el micro…" maxlength="4000">
+        <button type="submit" title="Enviar">➤</button>
+      </form>
+    </section>
+
+    <!-- Centro: núcleo reactor -->
+    <section class="centro">
+      <canvas id="nucleo" width="640" height="640" title="Pulsa para hablar"></canvas>
+      <div class="subtitulo" id="estadoVoz">INICIANDO…</div>
+      <div class="transcripcion" id="transcripcion"></div>
+      <button class="btn-micro" id="btnMicro" title="Hablar (Ctrl+Espacio)">🎙</button>
+    </section>
+
+    <!-- Panel derecho: pestañas -->
+    <section class="panel panel-der">
+      <nav class="pestanas">
+        <button data-pestana="pendiente" class="activa">PENDIENTE <span class="contador" id="contPendiente">0</span></button>
+        <button data-pestana="memoria">MEMORIA</button>
+        <button data-pestana="ajustes">AJUSTES</button>
+      </nav>
+
+      <div class="contenido-pestana" id="pestana-pendiente">
+        <div class="lista" id="listaPendiente"></div>
+      </div>
+
+      <div class="contenido-pestana oculto" id="pestana-memoria">
+        <div class="cabecera-lista">
+          <span id="panelRevisado">—</span>
+          <button id="btnRevisar">↻ Revisar ahora</button>
+        </div>
+        <div class="lista" id="listaMemoria"></div>
+      </div>
+
+      <div class="contenido-pestana oculto" id="pestana-ajustes">
+        <label class="ajuste">Color de las luces
+          <input type="color" id="ajColor">
+        </label>
+        <label class="ajuste">Modo RGB (arcoíris)
+          <input type="checkbox" id="ajRgb">
+        </label>
+        <label class="ajuste">Voz de Jarvis activada
+          <input type="checkbox" id="ajVoz">
+        </label>
+        <label class="ajuste">Volumen <span id="ajVolumenValor"></span>
+          <input type="range" id="ajVolumen" min="0" max="1" step="0.05">
+        </label>
+        <label class="ajuste">Voz de Windows
+          <select id="ajNombreVoz"></select>
+        </label>
+        <label class="ajuste">Modo conversación (vuelve a escuchar solo)
+          <input type="checkbox" id="ajConversacion">
+        </label>
+        <label class="ajuste" id="filaArranque">Arrancar con Windows
+          <input type="checkbox" id="ajArranque">
+        </label>
+        <div class="ajuste-botones">
+          <button id="btnProbarVoz">Probar voz</button>
+          <button id="btnProbarNotif">Probar notificación</button>
+        </div>
+        <p class="nota" id="notaAtajo"></p>
+        <p class="nota">Los ajustes se guardan solos.</p>
+      </div>
+    </section>
+  </main>
+
+  <script src="jarvis://app/vendor/vosk.js"></script>
+  <script src="voz.js"></script>
+  <script src="nucleo.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
