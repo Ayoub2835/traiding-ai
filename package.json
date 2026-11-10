@@ -14,6 +14,7 @@
     "probar-n8n": "node scripts/probar-n8n.js"
   },
   "dependencies": {
+    "@fontsource/noto-sans-arabic": "^5.3.0",
     "vosk-browser": "^0.0.8"
   },
   "devDependencies": {
@@ -37,8 +38,8 @@
     ],
     "extraResources": [
       {
-        "from": "config.json",
-        "to": "config.json"
+        "from": "config.ejemplo.json",
+        "to": "config.ejemplo.json"
       },
       {
         "from": "modelo",

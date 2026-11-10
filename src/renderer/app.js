@@ -1,23 +1,31 @@
-// Lógica de la interfaz de Jarvis: saludo, chat, voz, paneles y ajustes.
+// Lógica de la interfaz de Jarvis: conexión, saludo, voz, chat, paneles y ajustes.
 'use strict';
 
 const $ = (id) => document.getElementById(id);
 const api = window.jarvis;
+const { Grabadora, Reproductor, Pitidos, Vosk, Activacion, Boca } = window.VozJarvis;
 
 const estado = {
   info: null,
   ajustes: null,
   panel: { items: [] },
-  ocupado: false,         // hay una pregunta en curso a n8n
-  conversando: false,     // bucle de conversación por voz activo
+  conectado: false,
+  ocupado: false,       // hay una petición en curso a n8n
+  conversando: false,   // bucle de conversación por voz activo
+  grabando: false,
+  atajo: { ultimo: 0, mantenido: false, vigilante: null },
+  hablando: false,     // Jarvis está hablando (voz de n8n o de respaldo)
+  turno: 0,             // sube al pulsar Parar: se descartan respuestas que lleguen tarde
 };
 
 const nucleo = new window.Nucleo($('nucleo'));
-const oido = new window.VozJarvis.Oido();
-let boca = null;
+const grabadora = new Grabadora();
+const reproductor = new Reproductor();
+const activacion = new Activacion(() => alOirActivacion());
+let boca = null; // voz de Windows, solo de respaldo
 
-// Palabras para terminar la conversación por voz.
-const FRASES_FIN = /^(gracias( jarvis)?|para|parar|stop|adiós|adios|eso es todo|nada más|nada mas|calla|cállate|callate|silencio)$/i;
+// Frases para terminar la conversación (es / fr / darija).
+const FRASES_FIN = /^(gracias( jarvis)?|para|parar|stop|adiós|adios|eso es todo|nada más|nada mas|calla|cállate|callate|silencio|merci|c'est tout|safi|baraka|chokran|شكرا|صافي|بركة)[.!]?$/i;
 
 // ---------------------------------------------------------------------------
 // Utilidades de interfaz
@@ -25,6 +33,19 @@ const FRASES_FIN = /^(gracias( jarvis)?|para|parar|stop|adiós|adios|eso es todo
 function ponerEstadoVoz(texto, estadoNucleo) {
   $('estadoVoz').textContent = texto;
   if (estadoNucleo) nucleo.setEstado(estadoNucleo);
+}
+
+function reposo() {
+  if (!estado.ocupado && !estado.grabando && !estado.hablando && !reproductor.sonando && !(boca && boca.hablando)) {
+    ponerEstadoVoz('EN ESPERA', 'reposo');
+  }
+  actualizarBotones();
+}
+
+function actualizarBotones() {
+  const hablando = estado.hablando || reproductor.sonando || (boca && boca.hablando);
+  $('btnParar').classList.toggle('oculto', !(hablando || estado.ocupado || estado.conversando));
+  $('btnMicro').classList.toggle('activo', estado.grabando);
 }
 
 let temporizadorAviso = null;
@@ -35,12 +56,13 @@ function mostrarError(mensaje) {
   clearTimeout(temporizadorAviso);
   temporizadorAviso = setTimeout(() => $('aviso').classList.add('oculto'), 15000);
   nucleo.setEstado('error');
-  setTimeout(() => { if (nucleo.estado === 'error') nucleo.setEstado('reposo'); }, 2500);
+  setTimeout(() => { if (nucleo.estado === 'error') reposo(); }, 2500);
 }
 
 function añadirMensaje(quien, texto) {
   const div = document.createElement('div');
   div.className = `msg ${quien}`;
+  div.dir = 'auto'; // el árabe se muestra de derecha a izquierda automáticamente
   div.textContent = texto;
   $('chat').appendChild(div);
   $('chat').scrollTop = $('chat').scrollHeight;
@@ -67,107 +89,245 @@ const formatoFecha = (f) => {
 };
 
 // ---------------------------------------------------------------------------
-// Hablar (respeta el ajuste "voz sí/no" y el volumen)
+// Hablar: voz de Jarvis (mp3 de n8n) o, si no hay, voz de Windows de respaldo
 // ---------------------------------------------------------------------------
-async function decir(texto) {
-  if (!estado.ajustes.voz || !texto) return;
-  oido.detener(); // nunca escuchar mientras habla (evita que se oiga a sí mismo)
+async function decir({ texto, audioBase64 }) {
+  if (!estado.ajustes.voz || (!texto && !audioBase64)) return;
+  activacion.pausar(); // que no se "oiga" a sí mismo
+  estado.hablando = true;
   ponerEstadoVoz('HABLANDO', 'hablando');
-  await boca.hablar(texto, {
-    volumen: estado.ajustes.volumen,
-    nombreVoz: estado.ajustes.nombreVoz,
-    alNivel: (n) => nucleo.setNivel(n),
-  });
-  ponerEstadoVoz('EN ESPERA', 'reposo');
+  actualizarBotones();
+  const alNivel = (n) => nucleo.setNivel(n);
+  try {
+    if (audioBase64) {
+      await reproductor.reproducir(audioBase64, { volumen: estado.ajustes.volumen, alNivel });
+    } else {
+      await boca.hablar(texto, { volumen: estado.ajustes.volumen, nombreVoz: estado.ajustes.nombreVoz, alNivel });
+    }
+  } catch (e) {
+    mostrarError(e.message);
+  } finally {
+    estado.hablando = false;
+    reposo();
+  }
+}
+
+// Para a Jarvis: deja de hablar, de grabar y sale del modo conversación.
+function pararTodo() {
+  estado.turno++;
+  estado.conversando = false;
+  reproductor.parar();
+  if (boca) boca.callar();
+  if (estado.grabando) grabadora.cancelar();
+  nucleo.setNivel(0);
+  reposo();
+  reanudarActivacion();
 }
 
 // ---------------------------------------------------------------------------
-// Chat con n8n
+// Preguntar a Jarvis por el endpoint de voz (con respaldo si falla)
 // ---------------------------------------------------------------------------
-async function preguntar(texto) {
-  if (estado.ocupado) return null;
+/**
+ * @param {{texto?: string, blob?: Blob, mime?: string}} entrada
+ * @returns {Promise<boolean>} true si Jarvis respondió
+ */
+async function preguntar(entrada) {
+  if (estado.ocupado) return false;
   estado.ocupado = true;
-  añadirMensaje('yo', texto);
-  ponerEstadoVoz('PENSANDO…', 'pensando');
+  const turno = estado.turno;
+  if (entrada.texto) añadirMensaje('yo', entrada.texto);
+  ponerEstadoVoz('PROCESANDO…', 'pensando');
+  actualizarBotones();
   try {
-    const r = await api.enviarMensaje(texto);
-    if (!r.ok) {
-      añadirMensaje('error', '⚠ ' + r.error);
-      mostrarError('Chat con n8n: ' + r.error);
-      marcarRed(false, r.error);
-      ponerEstadoVoz('ERROR', 'error');
-      return null;
+    const datos = entrada.blob
+      ? { audio: await entrada.blob.arrayBuffer(), mime: entrada.mime }
+      : { texto: entrada.texto };
+    const r = await api.enviarVoz(datos);
+    if (turno !== estado.turno) return false; // se pulsó Parar mientras pensaba
+    if (r.ok) {
+      marcarRed(true);
+      if (entrada.blob) añadirMensaje('yo', r.pregunta || '(audio)');
+      $('transcripcion').textContent = entrada.blob ? r.pregunta : '';
+      añadirMensaje('jarvis', r.respuesta);
+      estado.ocupado = false;
+      await decir({ texto: r.respuesta, audioBase64: r.audioBase64 });
+      return true;
     }
-    marcarRed(true);
-    añadirMensaje('jarvis', r.respuesta);
-    return r.respuesta;
+    return await respaldo(entrada, r.error, turno);
+  } catch (e) {
+    return await respaldo(entrada, e.message || String(e), turno);
   } finally {
     estado.ocupado = false;
-    if (nucleo.estado === 'pensando') ponerEstadoVoz('EN ESPERA', 'reposo');
+    reposo();
   }
+}
+
+// Respaldo: si la voz de n8n falla, se transcribe en local con Vosk (español)
+// y se pregunta al chat de texto; se responde con la voz de Windows.
+async function respaldo(entrada, motivo, turno) {
+  mostrarError('Voz de n8n: ' + motivo);
+  añadirMensaje('error', '⚠ ' + motivo + ' — probando el modo de respaldo…');
+  let texto = entrada.texto;
+  if (!texto && entrada.blob) {
+    ponerEstadoVoz('RESPALDO LOCAL…', 'pensando');
+    try {
+      texto = await Vosk.transcribir(entrada.blob);
+    } catch (e) {
+      añadirMensaje('error', '⚠ ' + e.message);
+      return false;
+    }
+    if (!texto) {
+      añadirMensaje('error', '⚠ El respaldo local no entendió nada (solo entiende español).');
+      return false;
+    }
+    añadirMensaje('yo', texto);
+    $('transcripcion').textContent = texto;
+  }
+  const r = await api.enviarMensaje(texto);
+  if (turno !== estado.turno) return false;
+  if (!r.ok) {
+    marcarRed(false, r.error);
+    añadirMensaje('error', '⚠ Chat: ' + r.error);
+    mostrarError('Sin conexión con n8n: ' + r.error);
+    return false;
+  }
+  marcarRed(true);
+  añadirMensaje('jarvis', r.respuesta);
+  estado.ocupado = false;
+  await decir({ texto: r.respuesta });
+  return true;
 }
 
 $('formChat').addEventListener('submit', async (e) => {
   e.preventDefault();
   const texto = $('textoChat').value.trim();
-  if (!texto) return;
+  if (!texto || estado.ocupado) return;
   $('textoChat').value = '';
-  boca.callar();
-  const respuesta = await preguntar(texto);
-  await decir(respuesta);
+  reproductor.parar();
+  if (boca) boca.callar();
+  await preguntar({ texto });
 });
 
 // ---------------------------------------------------------------------------
-// Conversación por voz (modo conversación = vuelve a escuchar tras responder)
+// Conversación por voz: graba → n8n → responde → (modo conversación) repite
 // ---------------------------------------------------------------------------
 async function conversar() {
-  if (estado.conversando) {          // segundo toque = parar
-    detenerConversacion();
+  if (estado.conversando || estado.grabando) { // segundo toque = enviar ya / parar
+    if (estado.grabando) grabadora.detener(); else pararTodo();
     return;
   }
-  boca.callar();
+  if (!estado.conectado) return abrirConexion();
+  reproductor.parar();
+  if (boca) boca.callar();
+  activacion.pausar();
   estado.conversando = true;
-  $('btnMicro').classList.add('activo');
   try {
-    if (!oido.modelo) ponerEstadoVoz('CARGANDO OÍDO…', 'pensando');
-    await oido.cargar();
     while (estado.conversando) {
-      ponerEstadoVoz('ESCUCHANDO…', 'escuchando');
-      $('transcripcion').textContent = '';
-      const texto = await oido.escuchar({
-        alParcial: (p) => { $('transcripcion').textContent = p + '…'; },
-        alNivel: (n) => nucleo.setNivel(n),
-      });
-      if (!estado.conversando) break;
-      $('transcripcion').textContent = texto;
-      if (!texto) break;                       // silencio: se termina
-      if (FRASES_FIN.test(texto)) {
-        await decir('De acuerdo. Aquí estaré.');
-        break;
-      }
-      const respuesta = await preguntar(texto);
-      if (!respuesta) break;                   // error: ya se mostró el motivo
-      await decir(respuesta);
-      if (!estado.ajustes.conversacion) break;
+      const g = await grabarFrase();
+      if (!estado.conversando || !g || g.cancelada) break;
+      if (!g.hablado) { ponerEstadoVoz('NO TE HE OÍDO', 'reposo'); break; }
+      const ok = await preguntar({ blob: g.blob, mime: g.mime });
+      const ultimo = [...document.querySelectorAll('.msg.yo')].pop();
+      if (!ok || !estado.ajustes.conversacion) break;
+      if (ultimo && FRASES_FIN.test(ultimo.textContent.trim())) break;
     }
   } catch (e) {
     mostrarError(e.message || String(e));
   } finally {
-    detenerConversacion();
+    estado.conversando = false;
+    estado.grabando = false;
+    reposo();
+    reanudarActivacion();
   }
 }
 
-function detenerConversacion() {
-  estado.conversando = false;
-  oido.detener();
-  $('btnMicro').classList.remove('activo');
-  nucleo.setNivel(0);
-  if (!estado.ocupado && !boca.hablando) ponerEstadoVoz('EN ESPERA', 'reposo');
+async function grabarFrase() {
+  estado.grabando = true;
+  $('transcripcion').textContent = '';
+  ponerEstadoVoz('ESCUCHANDO…', 'escuchando');
+  actualizarBotones();
+  Pitidos.empezar(estado.ajustes.volumen);
+  try {
+    return await grabadora.grabar({
+      silencio: estado.info.silencioParaCortar || 1.5,
+      alNivel: (n) => nucleo.setNivel(n),
+    });
+  } finally {
+    estado.grabando = false;
+    Pitidos.terminar(estado.ajustes.volumen);
+    actualizarBotones();
+  }
 }
 
 $('btnMicro').addEventListener('click', conversar);
 $('nucleo').addEventListener('click', conversar);
-api.alPedirEscuchar(() => { if (!estado.conversando) conversar(); });
+$('btnParar').addEventListener('click', pararTodo);
+
+// Ctrl+Espacio (atajo global). Pulsar = empezar a hablar.
+// Mantener pulsado: Windows repite el atajo mientras lo mantienes; cuando
+// dejan de llegar repeticiones, sabemos que lo has soltado y se envía.
+api.alPedirEscuchar((datos) => {
+  const ahora = Date.now();
+  const a = estado.atajo;
+  const esRepeticion = ahora - a.ultimo < 300;
+  a.ultimo = ahora;
+  if (!datos || !datos.desdeAtajo) { if (!estado.conversando) conversar(); return; }
+
+  if (estado.grabando) {
+    if (esRepeticion) {
+      a.mantenido = true;
+      clearTimeout(a.vigilante);
+      a.vigilante = setTimeout(() => { if (a.mantenido && estado.grabando) grabadora.detener(); a.mantenido = false; }, 400);
+    } else {
+      grabadora.detener(); // segundo toque = enviar ya
+    }
+    return;
+  }
+  if (esRepeticion) return;
+  a.mantenido = false;
+  if (!estado.conversando) conversar();
+});
+// Con la ventana activa, soltar Espacio también envía (mantener para hablar).
+document.addEventListener('keyup', (e) => {
+  if (e.code === 'Space' && estado.atajo.mantenido && estado.grabando) {
+    estado.atajo.mantenido = false;
+    grabadora.detener();
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Palabra de activación "Jarvis" (Vosk, en local)
+// ---------------------------------------------------------------------------
+function alOirActivacion() {
+  if (estado.ocupado || estado.grabando || estado.conversando || reproductor.sonando) return;
+  conversar();
+}
+
+async function reanudarActivacion() {
+  if (!estado.ajustes || !estado.ajustes.activacion) return;
+  if (estado.ocupado || estado.grabando || estado.conversando || reproductor.sonando) return;
+  try {
+    await activacion.reanudar();
+  } catch (e) {
+    mostrarError('Palabra de activación: ' + e.message);
+  }
+}
+
+async function aplicarActivacion() {
+  const encendida = !!estado.ajustes.activacion;
+  $('estadoActivacion').classList.toggle('oculto', !encendida);
+  if (!encendida) return activacion.apagar();
+  $('estadoActivacion').textContent = '◌ cargando oído local…';
+  try {
+    await activacion.encender();
+    $('estadoActivacion').textContent = '◉ di «Jarvis»';
+    $('estadoActivacion').classList.add('escuchando');
+    if (estado.conversando || estado.ocupado || reproductor.sonando) activacion.pausar();
+  } catch (e) {
+    $('estadoActivacion').textContent = '✕ activación no disponible';
+    mostrarError('Palabra de activación: ' + e.message);
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Panel de memoria y pestaña PENDIENTE
@@ -175,6 +335,7 @@ api.alPedirEscuchar(() => { if (!estado.conversando) conversar(); });
 function tarjeta(item) {
   const div = document.createElement('div');
   div.className = 'tarjeta';
+  div.dir = 'auto';
   const partes = [
     ['tipo', [item.tipo, item.negocio].filter(Boolean).join(' · ')],
     ['titulo', item.titulo || '(sin título)'],
@@ -183,6 +344,7 @@ function tarjeta(item) {
   for (const [clase, texto] of partes) {
     const el = document.createElement('div');
     el.className = clase;
+    el.dir = 'auto';
     el.textContent = texto;
     div.appendChild(el);
   }
@@ -218,7 +380,9 @@ function pintarPanel(panel) {
   pintarLista($('listaPendiente'), pendientes, panel.ok === false && !items.length ? 'No se pudo leer el panel.' : 'Nada pendiente. 👌');
   pintarLista($('listaMemoria'), items, 'La memoria está vacía.');
   $('panelRevisado').textContent = panel.revisado ? 'Revisado ' + formatoFecha(panel.revisado) : '—';
-  if (panel.ok === false) {
+  if (panel.sinConectar) {
+    marcarRed(false, 'Sin conectar');
+  } else if (panel.ok === false) {
     marcarRed(false, panel.error);
     mostrarError('Panel de memoria: ' + panel.error);
   } else {
@@ -229,7 +393,7 @@ function pintarPanel(panel) {
 function marcarRed(ok, motivo) {
   $('estadoRed').classList.toggle('ok', ok);
   $('estadoRed').classList.toggle('mal', !ok);
-  $('estadoRedTexto').textContent = ok ? 'n8n conectado' : 'n8n sin conexión';
+  $('estadoRedTexto').textContent = ok ? 'n8n conectado' : (estado.conectado ? 'n8n sin conexión' : 'sin conectar');
   $('estadoRed').title = ok ? 'Conexión con n8n correcta' : motivo || '';
 }
 
@@ -249,6 +413,58 @@ document.querySelectorAll('.pestanas button').forEach((b) => b.addEventListener(
 api.alAbrirPestana(abrirPestana);
 
 // ---------------------------------------------------------------------------
+// Pantalla "Conectar Jarvis"
+// ---------------------------------------------------------------------------
+const CAMPOS_CONEXION = { chatUrl: 'cxChat', panelUrl: 'cxPanel', vozUrl: 'cxVoz' };
+let alConectar = null;
+
+async function abrirConexion() {
+  const c = await api.estadoConexion();
+  for (const [k, id] of Object.entries(CAMPOS_CONEXION)) {
+    $(id).value = c.urls[k] || '';
+    $(id + 'Estado').textContent = '';
+    $(id + 'Estado').className = '';
+  }
+  $('cxMensaje').textContent = '';
+  $('cxCancelar').classList.toggle('oculto', !estado.conectado);
+  $('capaConexion').classList.remove('oculto');
+  $(Object.values(CAMPOS_CONEXION).find((id) => !$(id).value) || 'cxChat').focus();
+  return new Promise((r) => { alConectar = r; });
+}
+
+function cerrarConexion(conectado) {
+  $('capaConexion').classList.add('oculto');
+  if (alConectar) { alConectar(conectado); alConectar = null; }
+}
+
+$('formConexion').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const urls = Object.fromEntries(Object.entries(CAMPOS_CONEXION).map(([k, id]) => [k, $(id).value.trim()]));
+  $('cxGuardar').disabled = true;
+  $('cxMensaje').textContent = 'Probando las 3 conexiones… (puede tardar unos segundos)';
+  for (const id of Object.values(CAMPOS_CONEXION)) { $(id + 'Estado').textContent = '…'; $(id + 'Estado').className = ''; }
+  try {
+    const r = await api.probarYGuardarConexion(urls);
+    for (const [k, id] of Object.entries(CAMPOS_CONEXION)) {
+      const campo = r.campos[k] || { ok: false, error: 'sin probar' };
+      $(id + 'Estado').textContent = campo.ok ? '✔ ' + (campo.detalle || 'correcto') : '✘ ' + campo.error;
+      $(id + 'Estado').className = campo.ok ? 'ok' : 'mal';
+    }
+    if (r.ok) {
+      $('cxMensaje').textContent = '✔ Guardado. ¡Jarvis está conectado!';
+      estado.conectado = true;
+      setTimeout(() => cerrarConexion(true), 900);
+    } else {
+      $('cxMensaje').textContent = 'No se ha guardado: corrige las direcciones marcadas con ✘.';
+    }
+  } finally {
+    $('cxGuardar').disabled = false;
+  }
+});
+$('cxCancelar').addEventListener('click', () => cerrarConexion(false));
+$('btnConexion').addEventListener('click', () => abrirConexion());
+
+// ---------------------------------------------------------------------------
 // Ajustes (se guardan solos en %APPDATA%\Jarvis\ajustes.json)
 // ---------------------------------------------------------------------------
 function pintarAjustes() {
@@ -259,6 +475,7 @@ function pintarAjustes() {
   $('ajVolumen').value = a.volumen;
   $('ajVolumenValor').textContent = Math.round(a.volumen * 100) + '%';
   $('ajConversacion').checked = a.conversacion;
+  $('ajActivacion').checked = !!a.activacion;
   $('ajArranque').checked = !!estado.info.arrancaConWindows;
   $('filaArranque').classList.toggle('oculto', !estado.info.puedeArrancarSolo);
   aplicarColor(a.colorLed);
@@ -281,21 +498,23 @@ async function guardar(cambios) {
   estado.ajustes = await api.guardarAjustes(cambios);
   if ('arranqueAutomatico' in cambios) estado.info = await api.info();
   pintarAjustes();
+  if ('activacion' in cambios) aplicarActivacion();
 }
 
 $('ajColor').addEventListener('input', (e) => aplicarColor(e.target.value));
 $('ajColor').addEventListener('change', (e) => guardar({ colorLed: e.target.value }));
 $('ajRgb').addEventListener('change', (e) => guardar({ modoRgb: e.target.checked }));
-$('ajVoz').addEventListener('change', (e) => { if (!e.target.checked) boca.callar(); guardar({ voz: e.target.checked }); });
+$('ajVoz').addEventListener('change', (e) => { if (!e.target.checked) { reproductor.parar(); boca.callar(); } guardar({ voz: e.target.checked }); });
 $('ajVolumen').addEventListener('input', (e) => { $('ajVolumenValor').textContent = Math.round(e.target.value * 100) + '%'; });
 $('ajVolumen').addEventListener('change', (e) => guardar({ volumen: Number(e.target.value) }));
 $('ajNombreVoz').addEventListener('change', (e) => guardar({ nombreVoz: e.target.value }));
 $('ajConversacion').addEventListener('change', (e) => guardar({ conversacion: e.target.checked }));
+$('ajActivacion').addEventListener('change', (e) => guardar({ activacion: e.target.checked }));
 $('ajArranque').addEventListener('change', (e) => guardar({ arranqueAutomatico: e.target.checked }));
 $('btnProbarVoz').addEventListener('click', () => {
   if (!estado.ajustes.voz) return mostrarError('La voz está desactivada en Ajustes.');
-  if (!boca.vocesEspanol().length) mostrarError('Windows no tiene voces en español instaladas (Configuración → Hora e idioma → Voz).');
-  decir(`Hola ${estado.info.nombreUsuario}, así suena mi voz.`);
+  // Prueba completa: texto → n8n → voz de Jarvis.
+  preguntar({ texto: `Di solo esta frase: "Hola ${estado.info.nombreUsuario}, así suena mi voz."` });
 });
 $('btnProbarNotif').addEventListener('click', () => api.notificacionPrueba());
 api.alCambiarAjustes(async (a) => { estado.ajustes = a; estado.info = await api.info(); pintarAjustes(); });
@@ -308,7 +527,12 @@ $('btnPantalla').addEventListener('click', () => api.pantallaCompleta());
 $('avisoCerrar').addEventListener('click', () => $('aviso').classList.add('oculto'));
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') {
-    if (estado.conversando || boca.hablando) { boca.callar(); detenerConversacion(); } else api.ocultar();
+    if (!$('capaConexion').classList.contains('oculto')) {
+      if (estado.conectado) cerrarConexion(false);
+      return;
+    }
+    const activo = estado.conversando || estado.grabando || estado.ocupado || reproductor.sonando || (boca && boca.hablando);
+    if (activo) pararTodo(); else api.ocultar();
   }
   if (e.key === 'F11') api.pantallaCompleta();
 });
@@ -317,7 +541,7 @@ setInterval(() => {
 }, 1000);
 
 // ---------------------------------------------------------------------------
-// Saludo inicial: "Buenos días, Ayoub" + lo pendiente
+// Saludo inicial: "Buenos días, Ayoub" + lo pendiente (con la voz de Jarvis)
 // ---------------------------------------------------------------------------
 // "un informe", "una idea", "una decisión"...
 function articulo(palabra) {
@@ -326,6 +550,7 @@ function articulo(palabra) {
   return femeninas.includes(p) || /(a|ión|ion|dad)$/.test(p) ? 'una' : 'un';
 }
 
+// Texto del saludo hecho en la app (se usa si n8n no responde).
 function textoSaludo() {
   const nombre = estado.info.nombreUsuario;
   let texto = `${saludoSegunHora()}, ${nombre}.`;
@@ -348,9 +573,29 @@ async function saludar() {
   // Solo una vez por arranque de la app (no al mostrar/ocultar la ventana).
   if (sessionStorage.getItem('saludado')) return;
   sessionStorage.setItem('saludado', '1');
-  const texto = textoSaludo();
-  añadirMensaje('jarvis', texto);
-  await decir(texto);
+  const textoLocal = textoSaludo();
+  if (!estado.ajustes.voz || estado.panel.ok === false) {
+    añadirMensaje('jarvis', textoLocal);
+    return decir({ texto: textoLocal });
+  }
+  // Pedimos a Jarvis que salude con SU voz, leyendo el mismo resumen.
+  estado.ocupado = true;
+  ponerEstadoVoz('PROCESANDO…', 'pensando');
+  try {
+    const r = await api.enviarVoz({
+      texto: `[Saludo automático de la app al encender el PC] Saluda en español en 2 o 3 frases, empezando exactamente por "${saludoSegunHora()}, ${estado.info.nombreUsuario}." y resume esto: ${textoLocal.split('.').slice(1).join('.').trim()}`,
+    });
+    estado.ocupado = false;
+    if (r.ok) {
+      añadirMensaje('jarvis', r.respuesta);
+      return await decir({ texto: r.respuesta, audioBase64: r.audioBase64 });
+    }
+    mostrarError('Voz de n8n: ' + r.error);
+  } finally {
+    estado.ocupado = false;
+  }
+  añadirMensaje('jarvis', textoLocal);
+  await decir({ texto: textoLocal });
 }
 
 // ---------------------------------------------------------------------------
@@ -360,37 +605,40 @@ async function iniciar() {
   iniciarFondo($('fondo'), () => getComputedStyle(document.documentElement).getPropertyValue('--led').trim() || '#00e5ff');
   estado.info = await api.info();
   estado.ajustes = await api.leerAjustes();
-  boca = new window.VozJarvis.Boca(estado.info.idiomaVoz);
+  boca = new Boca(estado.info.idiomaVoz);
   pintarAjustes();
   pintarVoces();
   speechSynthesis.addEventListener('voiceschanged', pintarVoces);
+  ponerEstadoVoz('EN ESPERA', 'reposo');
 
   if (estado.info.errorConfig) mostrarError('Configuración: ' + estado.info.errorConfig);
   $('notaAtajo').textContent = estado.info.atajo.ok
-    ? `Atajo global: ${estado.info.atajo.atajo.replace('CommandOrControl', 'Ctrl').replace('Space', 'Espacio')} para hablar desde cualquier sitio.`
+    ? `Atajo global: ${estado.info.atajo.atajo.replace('CommandOrControl', 'Ctrl').replace('Space', 'Espacio')} (pulsa, o mantén pulsado mientras hablas).`
     : estado.info.atajo.error;
   if (!estado.info.atajo.ok && estado.info.atajo.error) añadirMensaje('error', '⚠ ' + estado.info.atajo.error);
 
-  // Cargamos el modelo de voz en segundo plano para que el micro responda rápido.
-  ponerEstadoVoz('CARGANDO OÍDO…', 'pensando');
-  oido.cargar()
-    .then(() => { if (!estado.conversando && !boca.hablando && !estado.ocupado) ponerEstadoVoz('EN ESPERA', 'reposo'); })
-    .catch((e) => mostrarError(e.message));
+  // Primera vez: pantalla "Conectar Jarvis".
+  const conexion = await api.estadoConexion();
+  estado.conectado = conexion.faltan.length === 0;
+  if (!estado.conectado) {
+    marcarRed(false, 'Sin conectar');
+    await abrirConexion();
+  }
 
   // Esperamos al primer resultado del panel (máx. 20 s) para el saludo.
   let panel = await api.leerPanel();
   const limite = Date.now() + 20000;
-  while (!panel.revisado && Date.now() < limite) {
+  while ((!panel.revisado || panel.sinConectar) && Date.now() < limite) {
     await new Promise((r) => setTimeout(r, 500));
     panel = await api.leerPanel();
   }
   pintarPanel(panel);
-  // Las voces de Windows pueden tardar un instante en estar disponibles.
-  if (!boca.voces.length) await new Promise((r) => setTimeout(r, 800));
+  aplicarActivacion();
   await saludar();
+  reanudarActivacion();
 }
 
 iniciar().catch((e) => mostrarError('Error al iniciar: ' + e.message));
 
 // Para pruebas automáticas (no se usa en el uso normal).
-window.__jarvis = { estado, nucleo, oido, get boca() { return boca; }, textoSaludo, saludoSegunHora, preguntar, conversar };
+window.__jarvis = { estado, nucleo, grabadora, reproductor, activacion, Vosk, get boca() { return boca; }, textoSaludo, preguntar, conversar, pararTodo };

@@ -5,7 +5,8 @@
   <!-- Política de seguridad: solo recursos propios de la app; nada externo. -->
   <meta http-equiv="Content-Security-Policy"
         content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval' 'unsafe-eval'; worker-src 'self' blob: data:;
-                 connect-src 'self' jarvis: blob: data:; style-src 'self' 'unsafe-inline'; img-src 'self' data:; media-src 'self' blob:">
+                 connect-src 'self' jarvis: blob: data:; style-src 'self' 'unsafe-inline'; img-src 'self' data:;
+                 media-src 'self' blob: data:; font-src 'self' jarvis:">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Jarvis</title>
   <link rel="stylesheet" href="estilo.css">
@@ -18,6 +19,7 @@
   <header class="barra">
     <div class="logo">J.A.R.V.I.S.</div>
     <div class="estado-red" id="estadoRed" title="Conexión con n8n"><span class="punto"></span><span id="estadoRedTexto">conectando…</span></div>
+    <div class="estado-activacion oculto" id="estadoActivacion" title="Palabra de activación">◉ di «Jarvis»</div>
     <div class="reloj" id="reloj">--:--</div>
     <div class="botones">
       <button id="btnPantalla" title="Pantalla completa (F11)">⛶</button>
@@ -27,7 +29,7 @@
 
   <!-- Aviso de errores (n8n, micrófono, configuración...) -->
   <div class="aviso oculto" id="aviso" role="alert">
-    <span id="avisoTexto"></span>
+    <span id="avisoTexto" dir="auto"></span>
     <button id="avisoCerrar" title="Cerrar">✕</button>
   </div>
 
@@ -37,7 +39,7 @@
       <h2>CONVERSACIÓN</h2>
       <div class="chat" id="chat"></div>
       <form class="entrada" id="formChat" autocomplete="off">
-        <input id="textoChat" type="text" placeholder="Escribe a Jarvis o pulsa el micro…" maxlength="4000">
+        <input id="textoChat" type="text" dir="auto" placeholder="Escribe a Jarvis (español, darija, عربي, français)…" maxlength="4000">
         <button type="submit" title="Enviar">➤</button>
       </form>
     </section>
@@ -46,8 +48,11 @@
     <section class="centro">
       <canvas id="nucleo" width="640" height="640" title="Pulsa para hablar"></canvas>
       <div class="subtitulo" id="estadoVoz">INICIANDO…</div>
-      <div class="transcripcion" id="transcripcion"></div>
-      <button class="btn-micro" id="btnMicro" title="Hablar (Ctrl+Espacio)">🎙</button>
+      <div class="transcripcion" id="transcripcion" dir="auto"></div>
+      <div class="controles-voz">
+        <button class="btn-micro" id="btnMicro" title="Pulsa para hablar (o mantén Ctrl+Espacio)">🎙</button>
+        <button class="btn-parar oculto" id="btnParar" title="Parar a Jarvis (Esc)">■</button>
+      </div>
     </section>
 
     <!-- Panel derecho: pestañas -->
@@ -83,11 +88,14 @@
         <label class="ajuste">Volumen <span id="ajVolumenValor"></span>
           <input type="range" id="ajVolumen" min="0" max="1" step="0.05">
         </label>
-        <label class="ajuste">Voz de Windows
-          <select id="ajNombreVoz"></select>
-        </label>
         <label class="ajuste">Modo conversación (vuelve a escuchar solo)
           <input type="checkbox" id="ajConversacion">
+        </label>
+        <label class="ajuste">Palabra de activación «Jarvis» (sin conexión)
+          <input type="checkbox" id="ajActivacion">
+        </label>
+        <label class="ajuste">Voz de respaldo (si n8n no da audio)
+          <select id="ajNombreVoz"></select>
         </label>
         <label class="ajuste" id="filaArranque">Arrancar con Windows
           <input type="checkbox" id="ajArranque">
@@ -95,12 +103,38 @@
         <div class="ajuste-botones">
           <button id="btnProbarVoz">Probar voz</button>
           <button id="btnProbarNotif">Probar notificación</button>
+          <button id="btnConexion">Cambiar conexión con n8n</button>
         </div>
         <p class="nota" id="notaAtajo"></p>
         <p class="nota">Los ajustes se guardan solos.</p>
       </div>
     </section>
   </main>
+
+  <!-- Pantalla "Conectar Jarvis" (primera vez o desde Ajustes) -->
+  <div class="capa oculto" id="capaConexion">
+    <form class="tarjeta-conexion" id="formConexion" autocomplete="off">
+      <h1>CONECTAR JARVIS</h1>
+      <p class="nota">Pega las 3 direcciones (webhooks) de tu n8n. Se guardan solo en este PC.</p>
+      <label>URL del chat
+        <input id="cxChat" type="url" placeholder="https://…/webhook/…/chat" required>
+        <small id="cxChatEstado"></small>
+      </label>
+      <label>URL del panel de memoria
+        <input id="cxPanel" type="url" placeholder="https://…/webhook/…" required>
+        <small id="cxPanelEstado"></small>
+      </label>
+      <label>URL de voz
+        <input id="cxVoz" type="url" placeholder="https://…/webhook/…" required>
+        <small id="cxVozEstado"></small>
+      </label>
+      <div class="ajuste-botones">
+        <button type="submit" id="cxGuardar">Probar y guardar</button>
+        <button type="button" id="cxCancelar" class="oculto">Cancelar</button>
+      </div>
+      <p class="nota" id="cxMensaje"></p>
+    </form>
+  </div>
 
   <script src="jarvis://app/vendor/vosk.js"></script>
   <script src="voz.js"></script>

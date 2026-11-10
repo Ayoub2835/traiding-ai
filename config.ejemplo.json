@@ -1,0 +1,15 @@
+{
+  "nombreUsuario": "Ayoub",
+  "n8n": {
+    "chatUrl": "https://TU-INSTANCIA.app.n8n.cloud/webhook/ID-DEL-CHAT/chat",
+    "panelUrl": "https://TU-INSTANCIA.app.n8n.cloud/webhook/ID-DEL-PANEL",
+    "vozUrl": "https://TU-INSTANCIA.app.n8n.cloud/webhook/ID-DE-VOZ",
+    "timeoutChatSegundos": 90,
+    "timeoutPanelSegundos": 30,
+    "timeoutVozSegundos": 120
+  },
+  "revisarPanelCadaMinutos": 5,
+  "atajoGlobal": "CommandOrControl+Space",
+  "idiomaVoz": "es-ES",
+  "silencioParaCortarSegundos": 1.5
+}

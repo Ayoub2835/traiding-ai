@@ -8,7 +8,7 @@ const {
   protocol, session, net, dialog, nativeImage, shell,
 } = require('electron');
 const { pathToFileURL } = require('url');
-const { cargarConfig, hostsPermitidos } = require('./config');
+const { cargarConfig, faltanUrls, guardarConexion, hostsPermitidos, urlValida, CAMPOS_URL } = require('./config');
 const ajustes = require('./ajustes');
 const n8n = require('./n8n');
 
@@ -24,6 +24,8 @@ let saliendo = false;
 let estadoAtajo = { ok: false, atajo: '', error: '' };
 let ultimoPanel = { ok: false, error: 'Aún no se ha consultado el panel', items: [] };
 let temporizadorPanel = null;
+// Hosts que se permiten temporalmente mientras pruebas URLs en "Conectar Jarvis".
+const hostsEnPrueba = new Set();
 
 // ---------------------------------------------------------------------------
 // Una sola instancia: si ya está abierta, la segunda solo muestra la ventana.
@@ -52,6 +54,11 @@ function archivoParaUrl(urlTexto) {
   const ruta = decodeURIComponent(pathname);
   if (ruta === '/' || ruta === '') return path.join(RAIZ, 'src', 'renderer', 'Jarvis.html');
   if (ruta === '/vendor/vosk.js') return require.resolve('vosk-browser/dist/vosk.js');
+  if (ruta.startsWith('/fuentes/')) {
+    // Fuente árabe incluida en la app (Noto Sans Arabic, licencia OFL).
+    const base = path.dirname(require.resolve('@fontsource/noto-sans-arabic/package.json'));
+    return dentroDe(path.join(base, 'files'), ruta.slice('/fuentes/'.length));
+  }
   if (ruta.startsWith('/modelo/')) return dentroDe(rutaRecurso('modelo'), ruta.slice('/modelo/'.length));
   return dentroDe(path.join(RAIZ, 'src', 'renderer'), ruta.slice(1));
 }
@@ -64,13 +71,13 @@ function dentroDe(base, relativa) {
 // Seguridad de red: SOLO se permite hablar con tu n8n.
 // ---------------------------------------------------------------------------
 function configurarSesion() {
-  const permitidos = cfg ? hostsPermitidos(cfg) : new Set();
   const ses = session.defaultSession;
 
   ses.webRequest.onBeforeRequest((detalles, responder) => {
     const u = new URL(detalles.url);
     const local = [`${ESQUEMA}:`, 'file:', 'data:', 'blob:', 'devtools:', 'chrome-extension:'].includes(u.protocol);
-    const n8nOk = u.protocol === 'https:' && permitidos.has(u.host);
+    // Se calcula en cada petición: las URLs pueden cambiar desde "Conectar Jarvis".
+    const n8nOk = u.protocol === 'https:' && (hostsPermitidos(cfg).has(u.host) || hostsEnPrueba.has(u.host));
     if (!local && !n8nOk) console.warn('[red] Bloqueado:', detalles.url);
     responder({ cancel: !(local || n8nOk) });
   });
@@ -207,7 +214,9 @@ async function preguntarArranqueSiHaceFalta() {
 // ---------------------------------------------------------------------------
 function escucharDesdeAtajo() {
   mostrarVentana();
-  enviar('voz:escuchar');
+  // La interfaz sabrá que viene del atajo: si sigues pulsando Espacio con la
+  // ventana activa, al soltarlo se corta la grabación ("mantener para hablar").
+  enviar('voz:escuchar', { desdeAtajo: true });
 }
 function registrarAtajo() {
   const atajo = (cfg && cfg.atajoGlobal) || 'CommandOrControl+Space';
@@ -216,15 +225,20 @@ function registrarAtajo() {
   estadoAtajo = {
     ok,
     atajo,
-    error: ok ? '' : `No se pudo registrar el atajo ${atajo} (¿lo usa otra aplicación?). Cámbialo en config.json → "atajoGlobal".`,
+    error: ok ? '' : `No se pudo registrar el atajo ${atajo} (¿lo usa otra aplicación?). Cámbialo en %APPDATA%\\Jarvis\\config.json → "atajoGlobal".`,
   };
 }
 
 // ---------------------------------------------------------------------------
 // Panel de memoria: se revisa cada X minutos y avisa de ideas/informes nuevos
 // ---------------------------------------------------------------------------
+const conectado = () => cfg && faltanUrls(cfg).length === 0;
+
 async function revisarPanel() {
-  if (!cfg) return ultimoPanel;
+  if (!conectado()) {
+    ultimoPanel = { ok: false, error: 'Jarvis aún no está conectado a n8n', items: [], revisado: new Date().toISOString(), sinConectar: true };
+    return ultimoPanel;
+  }
   const r = await n8n.leerPanel(cfg);
   ultimoPanel = { ...r, items: r.items || ultimoPanel.items || [], revisado: new Date().toISOString() };
   if (r.ok) avisarNovedades(r.items);
@@ -276,6 +290,7 @@ function registrarIpc() {
   ipcMain.handle('app:info', () => ({
     nombreUsuario: (cfg && cfg.nombreUsuario) || 'Ayoub',
     idiomaVoz: (cfg && cfg.idiomaVoz) || 'es-ES',
+    silencioParaCortar: Number(cfg && cfg.silencioParaCortarSegundos) || 1.5,
     errorConfig,
     atajo: estadoAtajo,
     inicioAutomatico: INICIO_AUTOMATICO,
@@ -285,10 +300,26 @@ function registrarIpc() {
   }));
 
   ipcMain.handle('chat:enviar', async (_e, texto) => {
-    if (!cfg) return { ok: false, error: errorConfig || 'Sin configuración' };
+    if (!conectado()) return { ok: false, error: errorConfig || 'Jarvis no está conectado a n8n' };
     if (typeof texto !== 'string' || !texto.trim()) return { ok: false, error: 'Mensaje vacío' };
     return n8n.enviarMensaje(cfg, ajustes.leer().sessionId, texto.trim().slice(0, 4000));
   });
+
+  // Voz: audio grabado ({audio: ArrayBuffer, mime}) o texto escrito ({texto}).
+  ipcMain.handle('voz:enviar', async (_e, datos = {}) => {
+    if (!conectado()) return { ok: false, error: errorConfig || 'Jarvis no está conectado a n8n' };
+    const audio = datos.audio ? Buffer.from(datos.audio) : null;
+    if (audio && audio.length > 25 * 1024 * 1024) return { ok: false, error: 'La grabación es demasiado larga' };
+    const texto = typeof datos.texto === 'string' ? datos.texto.slice(0, 4000) : '';
+    return n8n.voz(cfg, ajustes.leer().sessionId, { audio, mime: String(datos.mime || ''), texto });
+  });
+
+  // Pantalla "Conectar Jarvis"
+  ipcMain.handle('conexion:estado', () => ({
+    faltan: faltanUrls(cfg),
+    urls: Object.fromEntries(CAMPOS_URL.map((k) => [k, (cfg && cfg.n8n && cfg.n8n[k]) || ''])),
+  }));
+  ipcMain.handle('conexion:probarYGuardar', (_e, urls) => probarYGuardarConexion(urls || {}));
 
   ipcMain.handle('panel:leer', () => ultimoPanel);
   ipcMain.handle('panel:revisar', () => revisarPanel());
@@ -298,7 +329,7 @@ function registrarIpc() {
     // Solo se aceptan claves conocidas y con el tipo correcto.
     const limpio = {};
     if (typeof cambios.colorLed === 'string' && /^#[0-9a-f]{6}$/i.test(cambios.colorLed)) limpio.colorLed = cambios.colorLed;
-    for (const k of ['voz', 'conversacion', 'modoRgb']) if (typeof cambios[k] === 'boolean') limpio[k] = cambios[k];
+    for (const k of ['voz', 'conversacion', 'modoRgb', 'activacion']) if (typeof cambios[k] === 'boolean') limpio[k] = cambios[k];
     if (typeof cambios.volumen === 'number') limpio.volumen = Math.min(1, Math.max(0, cambios.volumen));
     if (typeof cambios.nombreVoz === 'string') limpio.nombreVoz = cambios.nombreVoz.slice(0, 200);
     if (typeof cambios.arranqueAutomatico === 'boolean') fijarArranque(cambios.arranqueAutomatico);
@@ -308,6 +339,47 @@ function registrarIpc() {
   ipcMain.on('ventana:ocultar', () => ventana && ventana.hide());
   ipcMain.on('ventana:pantallaCompleta', () => ventana && ventana.setFullScreen(!ventana.isFullScreen()));
   ipcMain.on('notificar:prueba', () => mostrarNotificacion('Jarvis', 'Las notificaciones funcionan correctamente.'));
+}
+
+// ---------------------------------------------------------------------------
+// "Conectar Jarvis": prueba las 3 URLs y, si todas responden, las guarda
+// en %APPDATA%\Jarvis\conexion.json (fuera del repositorio).
+// ---------------------------------------------------------------------------
+async function probarYGuardarConexion(urls) {
+  const resultado = { ok: false, campos: {} };
+  for (const k of CAMPOS_URL) {
+    urls[k] = String(urls[k] || '').trim();
+    if (!urlValida(urls[k])) resultado.campos[k] = { ok: false, error: 'Escribe una URL que empiece por https://' };
+  }
+  if (Object.keys(resultado.campos).length) return resultado;
+
+  const prueba = { ...(cfg || {}), n8n: { ...((cfg && cfg.n8n) || {}), ...urls } };
+  const hosts = CAMPOS_URL.map((k) => new URL(urls[k]).host);
+  hosts.forEach((h) => hostsEnPrueba.add(h));
+  try {
+    const frase = 'Prueba de conexión de la app Jarvis. Responde solo: OK';
+    const [panel, chat, voz] = await Promise.all([
+      n8n.leerPanel(prueba),
+      n8n.enviarMensaje(prueba, 'prueba-conexion', frase),
+      n8n.voz(prueba, 'prueba-conexion', { texto: frase }),
+    ]);
+    resultado.campos.panelUrl = panel.ok ? { ok: true, detalle: `${panel.items.length} elementos` } : { ok: false, error: panel.error };
+    resultado.campos.chatUrl = chat.ok ? { ok: true, detalle: `respondió: ${chat.respuesta.slice(0, 40)}` } : { ok: false, error: chat.error };
+    resultado.campos.vozUrl = voz.ok
+      ? (voz.audioBase64 ? { ok: true, detalle: 'respondió con voz' } : { ok: false, error: 'Respondió, pero sin audio (audio_base64)' })
+      : { ok: false, error: voz.error };
+  } finally {
+    hosts.forEach((h) => hostsEnPrueba.delete(h));
+  }
+  resultado.ok = CAMPOS_URL.every((k) => resultado.campos[k].ok);
+  if (resultado.ok) {
+    guardarConexion(urls);
+    cfg = cargarConfig();
+    errorConfig = null;
+    await revisarPanel();
+    iniciarRevisionPeriodica();
+  }
+  return resultado;
 }
 
 // ---------------------------------------------------------------------------
@@ -331,7 +403,7 @@ app.whenReady().then(async () => {
   // Primera revisión del panel en cuanto carga la interfaz y luego cada X minutos.
   ventana.webContents.once('did-finish-load', async () => {
     await revisarPanel();
-    iniciarRevisionPeriodica();
+    if (conectado()) iniciarRevisionPeriodica();
     preguntarArranqueSiHaceFalta();
   });
 });

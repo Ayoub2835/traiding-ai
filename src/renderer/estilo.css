@@ -1,4 +1,18 @@
 /* Estilo de Jarvis: fondo negro, luces LED de color, tipografía tipo HUD. */
+
+/* Fuente árabe incluida en la app (no se descarga de internet). */
+@font-face {
+  font-family: "Noto Sans Arabic";
+  src: url("jarvis://app/fuentes/noto-sans-arabic-arabic-400-normal.woff2") format("woff2");
+  font-weight: 400;
+  unicode-range: U+0600-06FF, U+0750-077F, U+08A0-08FF, U+FB50-FDFF, U+FE70-FEFF;
+}
+@font-face {
+  font-family: "Noto Sans Arabic";
+  src: url("jarvis://app/fuentes/noto-sans-arabic-arabic-600-normal.woff2") format("woff2");
+  font-weight: 600;
+  unicode-range: U+0600-06FF, U+0750-077F, U+08A0-08FF, U+FB50-FDFF, U+FE70-FEFF;
+}
 :root {
   --led: #00e5ff;          /* color base de las luces (se cambia en Ajustes) */
   --led-suave: rgba(0, 229, 255, 0.25);
@@ -13,7 +27,7 @@
 html, body {
   margin: 0; height: 100%; overflow: hidden;
   background: var(--fondo); color: var(--texto);
-  font-family: "Segoe UI", "Bahnschrift", system-ui, sans-serif;
+  font-family: "Noto Sans Arabic", "Segoe UI", "Bahnschrift", system-ui, sans-serif;
   user-select: none;
 }
 #fondo { position: fixed; inset: 0; width: 100%; height: 100%; z-index: 0; }
@@ -65,6 +79,7 @@ html, body {
 /* ---- Chat ---- */
 .chat { flex: 1; overflow-y: auto; padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; user-select: text; }
 .msg { padding: 9px 12px; border-radius: 8px; font-size: 14px; line-height: 1.45; white-space: pre-wrap; word-wrap: break-word; max-width: 92%; }
+.msg:dir(rtl) { text-align: right; font-size: 15px; line-height: 1.7; }
 .msg.yo { align-self: flex-end; background: rgba(255, 255, 255, 0.07); border: 1px solid rgba(255, 255, 255, 0.12); }
 .msg.jarvis { align-self: flex-start; background: rgba(0, 0, 0, 0.5); border: 1px solid var(--led-suave); }
 .msg.sistema { align-self: center; color: var(--texto-suave); font-size: 12px; }
@@ -82,7 +97,31 @@ html, body {
   width: 58px; height: 58px; border-radius: 50%; border: 1px solid var(--led); background: rgba(0, 0, 0, 0.6);
   color: var(--texto); font-size: 24px; cursor: pointer; box-shadow: 0 0 18px var(--led-suave);
 }
-.btn-micro.activo { background: var(--led); color: #000; box-shadow: 0 0 30px var(--led); }
+.btn-micro.activo { background: var(--led); color: #000; box-shadow: 0 0 30px var(--led); animation: latido 1s infinite; }
+@keyframes latido { 50% { box-shadow: 0 0 6px var(--led); } }
+.controles-voz { display: flex; gap: 16px; align-items: center; }
+.btn-parar {
+  width: 58px; height: 58px; border-radius: 50%; border: 1px solid var(--error); background: rgba(40, 0, 10, 0.7);
+  color: #ffd6de; font-size: 22px; cursor: pointer; box-shadow: 0 0 18px rgba(255, 59, 92, 0.35);
+}
+.estado-activacion { font-size: 12px; letter-spacing: 0.1em; color: var(--led); opacity: 0.85; }
+.estado-activacion.escuchando { animation: latidoTexto 2s infinite; }
+@keyframes latidoTexto { 50% { opacity: 0.4; } }
+
+/* Pantalla "Conectar Jarvis" */
+.capa { position: fixed; inset: 0; z-index: 20; background: rgba(0, 0, 0, 0.88); display: flex; align-items: center; justify-content: center; padding: 16px; }
+.tarjeta-conexion {
+  width: min(620px, 100%); background: var(--panel); border: 1px solid var(--led); border-radius: 12px; padding: 28px;
+  box-shadow: 0 0 40px var(--led-suave); display: flex; flex-direction: column; gap: 14px; user-select: text;
+}
+.tarjeta-conexion h1 { margin: 0; font-size: 18px; letter-spacing: 0.4em; color: var(--led); text-shadow: 0 0 12px var(--led); }
+.tarjeta-conexion label { display: flex; flex-direction: column; gap: 6px; font-size: 13px; }
+.tarjeta-conexion input { background: #000; color: var(--texto); border: 1px solid var(--led-suave); border-radius: 6px; padding: 10px; font-size: 13px; }
+.tarjeta-conexion input:focus { outline: none; border-color: var(--led); }
+.tarjeta-conexion small { min-height: 16px; font-size: 12px; }
+.tarjeta-conexion small.ok { color: var(--ok); }
+.tarjeta-conexion small.mal { color: var(--error); }
+.tarjeta-conexion button[type="submit"] { border-color: var(--led); color: var(--led); }
 
 /* ---- Pestañas ---- */
 .pestanas { display: flex; border-bottom: 1px solid var(--led-suave); }

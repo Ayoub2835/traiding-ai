@@ -100,8 +100,36 @@ class Nucleo {
       ctx.stroke();
     }
 
+    // "Procesando": tres cometas que giran y un anillo de escaneo que se expande
+    if (this.estado === 'pensando') {
+      for (let k = 0; k < 3; k++) {
+        const ang = this.t * (2.5 + k * 0.9) * (k % 2 ? -1 : 1) + (k * Math.PI * 2) / 3;
+        const radio = R * (0.56 + k * 0.17);
+        for (let j = 0; j < 18; j++) {
+          const a = ang - j * 0.06 * (k % 2 ? -1 : 1);
+          const alfa = (1 - j / 18) * 0.9;
+          const col = this._color(k * 120 + j * 4, 65, alfa);
+          ctx.shadowBlur = W * 0.025;
+          ctx.shadowColor = col;
+          ctx.fillStyle = col;
+          ctx.beginPath();
+          ctx.arc(c + Math.cos(a) * radio, c + Math.sin(a) * radio, W * 0.009 * (1 - j / 22), 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+      const fase = (this.t * 0.7) % 1;
+      ctx.shadowBlur = 0;
+      ctx.strokeStyle = this._color(0, 60, 0.5 * (1 - fase));
+      ctx.lineWidth = W * 0.004;
+      ctx.beginPath();
+      ctx.arc(c, c, R * (0.2 + fase * 0.8), 0, Math.PI * 2);
+      ctx.stroke();
+    }
+
     // Núcleo central brillante que "respira" con la voz
-    const rNucleo = R * (0.17 + this.nivel * 0.08 + pulso * 0.01);
+    // Al hablar, el núcleo late con más fuerza siguiendo el volumen real de la voz.
+    const latido = this.estado === 'hablando' ? 0.16 : 0.08;
+    const rNucleo = R * (0.17 + this.nivel * latido + pulso * 0.01);
     const grad = ctx.createRadialGradient(c, c, 0, c, c, rNucleo * 1.9);
     grad.addColorStop(0, 'rgba(255,255,255,0.95)');
     grad.addColorStop(0.35, this._color(0, 65, 0.9));

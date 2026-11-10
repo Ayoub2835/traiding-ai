@@ -10,8 +10,9 @@ const POR_DEFECTO = {
   modoRgb: true,           // arcoíris animado sobre el color base
   voz: true,               // Jarvis habla en voz alta
   volumen: 0.9,            // 0..1
-  nombreVoz: '',           // voz de Windows elegida ('' = la primera en español)
+  nombreVoz: '',           // voz de Windows de RESPALDO ('' = la primera en español)
   conversacion: true,      // vuelve a escuchar tras responder
+  activacion: false,       // palabra de activación "Jarvis" (escucha local con Vosk)
   arranqueAutomatico: null,// null = aún no se ha preguntado
   sessionId: '',           // id de sesión para la memoria del chat en n8n
   idsVistos: [],           // elementos del panel ya notificados

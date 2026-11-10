@@ -11,6 +11,10 @@ const escuchar = (canal) => (fn) => {
 contextBridge.exposeInMainWorld('jarvis', {
   info: () => ipcRenderer.invoke('app:info'),
   enviarMensaje: (texto) => ipcRenderer.invoke('chat:enviar', texto),
+  // Voz por n8n: { audio: ArrayBuffer, mime } o { texto }
+  enviarVoz: (datos) => ipcRenderer.invoke('voz:enviar', datos),
+  estadoConexion: () => ipcRenderer.invoke('conexion:estado'),
+  probarYGuardarConexion: (urls) => ipcRenderer.invoke('conexion:probarYGuardar', urls),
   leerPanel: () => ipcRenderer.invoke('panel:leer'),
   revisarPanel: () => ipcRenderer.invoke('panel:revisar'),
   leerAjustes: () => ipcRenderer.invoke('ajustes:leer'),
