@@ -1,0 +1,24 @@
+# Adaptado de OpenJarvis — src/openjarvis/skills/data/email-draft.toml
+# Copyright 2025 The OpenJarvis Authors. Licencia Apache 2.0 (ver NOTICE).
+# Cambios: traducido; solo redacta el borrador (enviar requiere tu confirmación aparte).
+[habilidad]
+nombre = "borrador-email"
+descripcion = "Redacta un borrador de email profesional (no lo envía)"
+version = "1.0.0"
+autor = "OpenJarvis (adaptado)"
+disparadores = ["redacta un email", "redacta un correo", "escribe un email", "borrador de correo", "rédige un email"]
+
+[[habilidad.pasos]]
+herramienta = "pensar"
+plantilla = "Analiza qué quiere Ayoub con este email: tono adecuado, puntos clave y resultado buscado. Petición: {entrada}"
+salida = "analisis"
+
+[[habilidad.pasos]]
+herramienta = "pensar"
+plantilla = "Redacta el email (saludo, cuerpo con cada punto y despedida) en el idioma de la petición. Análisis: {analisis}. Petición original: {entrada}. Devuelve solo el email."
+salida = "borrador"
+
+[[habilidad.pasos]]
+herramienta = "pensar"
+plantilla = "Revisa claridad, tono y ortografía de este borrador y devuelve la versión final, sin comentarios: {borrador}"
+salida = "final"

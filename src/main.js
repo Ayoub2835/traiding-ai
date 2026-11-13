@@ -1,6 +1,8 @@
-// Proceso principal de Jarvis (Electron).
+// Proceso principal de Jarvis v2 (Electron).
 // Se encarga de: ventana, icono en la bandeja, atajo global, arranque con
-// Windows, permisos del micrófono, llamadas a n8n y notificaciones.
+// Windows, permisos del micrófono, conexión con n8n y notificaciones.
+// Los módulos nuevos (cerebro, voz, manos, habilidades, rutinas, memoria,
+// avisos, seguridad) se unen en servicios.js.
 const path = require('path');
 const fs = require('fs');
 const {
@@ -8,13 +10,18 @@ const {
   protocol, session, net, dialog, nativeImage, shell,
 } = require('electron');
 const { pathToFileURL } = require('url');
-const { cargarConfig, faltanUrls, guardarConexion, hostsPermitidos, urlValida, CAMPOS_URL } = require('./config');
-const ajustes = require('./ajustes');
-const n8n = require('./n8n');
+const { cargarConfig, faltanUrls, guardarConexion, urlValida, CAMPOS_URL } = require('./nucleo/config');
+const ajustes = require('./nucleo/ajustes');
+const n8n = require('./nucleo/n8n');
+const red = require('./nucleo/red');
+const servicios = require('./servicios');
 
 const APP_ID = 'com.ayoub.jarvis';
 const ESQUEMA = 'jarvis';             // la interfaz se sirve como jarvis://app/...
 const INICIO_AUTOMATICO = process.argv.includes('--autoarranque');
+// "--rutina=<id>": lo usa el Programador de tareas de Windows.
+const rutinaDeArgs = (argv) => { const a = (argv || []).find((x) => String(x).startsWith('--rutina=')); return a ? a.split('=')[1] : null; };
+const RUTINA_INICIAL = rutinaDeArgs(process.argv);
 
 let cfg = null;
 let errorConfig = null;
@@ -33,7 +40,11 @@ const hostsEnPrueba = new Set();
 if (!app.requestSingleInstanceLock()) {
   app.quit();
 } else {
-  app.on('second-instance', () => mostrarVentana());
+  app.on('second-instance', (_e, argv) => {
+    const rutina = rutinaDeArgs(argv);
+    if (rutina) servicios.ejecutarRutina(rutina, { desdeWindows: true });
+    else mostrarVentana();
+  });
 }
 
 // Esquema propio "jarvis://": contexto seguro (necesario para el micrófono)
@@ -52,7 +63,8 @@ const ICONO = path.join(RAIZ, 'assets', 'icon.png');
 function archivoParaUrl(urlTexto) {
   const { pathname } = new URL(urlTexto);
   const ruta = decodeURIComponent(pathname);
-  if (ruta === '/' || ruta === '') return path.join(RAIZ, 'src', 'renderer', 'Jarvis.html');
+  if (ruta === '/' || ruta === '') return path.join(RAIZ, 'src', 'ui', 'Jarvis.html');
+  if (ruta.startsWith('/voz/')) return dentroDe(path.join(RAIZ, 'src', 'voz', 'navegador'), ruta.slice('/voz/'.length));
   if (ruta === '/vendor/vosk.js') return require.resolve('vosk-browser/dist/vosk.js');
   if (ruta.startsWith('/fuentes/')) {
     // Fuente árabe incluida en la app (Noto Sans Arabic, licencia OFL).
@@ -60,7 +72,7 @@ function archivoParaUrl(urlTexto) {
     return dentroDe(path.join(base, 'files'), ruta.slice('/fuentes/'.length));
   }
   if (ruta.startsWith('/modelo/')) return dentroDe(rutaRecurso('modelo'), ruta.slice('/modelo/'.length));
-  return dentroDe(path.join(RAIZ, 'src', 'renderer'), ruta.slice(1));
+  return dentroDe(path.join(RAIZ, 'src', 'ui'), ruta.slice(1));
 }
 function dentroDe(base, relativa) {
   const completa = path.normalize(path.join(base, relativa));
@@ -68,18 +80,18 @@ function dentroDe(base, relativa) {
 }
 
 // ---------------------------------------------------------------------------
-// Seguridad de red: SOLO se permite hablar con tu n8n.
+// Seguridad de red: la ventana solo habla con tu n8n y los servicios con clave.
 // ---------------------------------------------------------------------------
 function configurarSesion() {
   const ses = session.defaultSession;
 
   ses.webRequest.onBeforeRequest((detalles, responder) => {
-    const u = new URL(detalles.url);
-    const local = [`${ESQUEMA}:`, 'file:', 'data:', 'blob:', 'devtools:', 'chrome-extension:'].includes(u.protocol);
-    // Se calcula en cada petición: las URLs pueden cambiar desde "Conectar Jarvis".
-    const n8nOk = u.protocol === 'https:' && (hostsPermitidos(cfg).has(u.host) || hostsEnPrueba.has(u.host));
-    if (!local && !n8nOk) console.warn('[red] Bloqueado:', detalles.url);
-    responder({ cancel: !(local || n8nOk) });
+    // Se calcula en cada petición: las URLs y claves pueden cambiar en Ajustes.
+    let enPrueba = false;
+    try { enPrueba = hostsEnPrueba.has(new URL(detalles.url).host); } catch (_) { /* URL rara */ }
+    const ok = red.permitida(detalles.url, cfg) || enPrueba;
+    if (!ok) console.warn('[red] Bloqueado:', detalles.url);
+    responder({ cancel: !ok });
   });
 
   // Permisos: solo micrófono (sin cámara) y notificaciones.
@@ -168,6 +180,8 @@ function actualizarMenuBandeja() {
     { label: 'Abrir / ocultar Jarvis', click: alternarVentana },
     { label: `Hablar con Jarvis (${(cfg && cfg.atajoGlobal) || 'Ctrl+Espacio'})`, click: escucharDesdeAtajo },
     { label: 'Revisar panel ahora', click: () => revisarPanel() },
+    { label: 'Resumen de la mañana ahora', click: () => servicios.ejecutarRutina('resumen', { desdeWindows: true }) },
+    { label: 'Ver tareas', click: () => { mostrarVentana(); enviar('ui:abrirPestana', 'tareas'); } },
     { type: 'separator' },
     {
       label: 'Arrancar con Windows', type: 'checkbox', checked: auto, enabled: puedeArrancarSolo(),
@@ -263,6 +277,10 @@ function avisarNovedades(items) {
         item.titulo || '(sin título)',
         item.euros ? `${item.titulo} · ~${item.euros} €` : undefined
       );
+      // También al móvil (ntfy), si está configurado y activado.
+      if (a.avisarMovilNovedades) {
+        require('./avisos').avisar({ titulo: tipo === 'idea' ? 'Nueva idea de Jarvis' : 'Nuevo informe de Jarvis', mensaje: `${item.titulo || ''}${item.euros ? ` · ~${item.euros} €` : ''}` }).catch(() => {});
+      }
     }
   }
   // Se guardan como mucho los últimos 200 ids.
@@ -329,7 +347,8 @@ function registrarIpc() {
     // Solo se aceptan claves conocidas y con el tipo correcto.
     const limpio = {};
     if (typeof cambios.colorLed === 'string' && /^#[0-9a-f]{6}$/i.test(cambios.colorLed)) limpio.colorLed = cambios.colorLed;
-    for (const k of ['voz', 'conversacion', 'modoRgb', 'activacion']) if (typeof cambios[k] === 'boolean') limpio[k] = cambios[k];
+    for (const k of ['voz', 'conversacion', 'modoRgb', 'activacion', 'interrumpir', 'avisarMovilNovedades']) if (typeof cambios[k] === 'boolean') limpio[k] = cambios[k];
+    if (['auto', 'clasico', 'n8n'].includes(cambios.modoVoz)) limpio.modoVoz = cambios.modoVoz;
     if (typeof cambios.volumen === 'number') limpio.volumen = Math.min(1, Math.max(0, cambios.volumen));
     if (typeof cambios.nombreVoz === 'string') limpio.nombreVoz = cambios.nombreVoz.slice(0, 200);
     if (typeof cambios.arranqueAutomatico === 'boolean') fijarArranque(cambios.arranqueAutomatico);
@@ -396,6 +415,13 @@ app.whenReady().then(async () => {
   }
   configurarSesion();
   registrarIpc();
+  servicios.iniciar({
+    cfg: () => cfg,
+    ventana: () => ventana,
+    mostrar: () => mostrarVentana(),
+    panel: () => ultimoPanel,
+    icono: ICONO,
+  });
   crearVentana();
   crearBandeja();
   registrarAtajo();
@@ -405,6 +431,7 @@ app.whenReady().then(async () => {
     await revisarPanel();
     if (conectado()) iniciarRevisionPeriodica();
     preguntarArranqueSiHaceFalta();
+    if (RUTINA_INICIAL) servicios.ejecutarRutina(RUTINA_INICIAL, { desdeWindows: true });
   });
 });
 

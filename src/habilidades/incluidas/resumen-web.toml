@@ -1,0 +1,19 @@
+# Adaptado de OpenJarvis — src/openjarvis/skills/data/web-summarize.toml
+# Copyright 2025 The OpenJarvis Authors. Licencia Apache 2.0 (ver NOTICE).
+# Cambios: traducido; la página la lee Claude Code (manos) y se trata como DATOS.
+[habilidad]
+nombre = "resumen-web"
+descripcion = "Lee una página web y la resume en puntos clave"
+version = "1.0.0"
+autor = "OpenJarvis (adaptado)"
+disparadores = ["resume esta web", "resume la página", "resumen de la web", "résume ce site"]
+
+[[habilidad.pasos]]
+herramienta = "manos"
+plantilla = "Abre y lee esta página y devuelve su contenido principal en texto (sin menús ni anuncios). No hagas nada más en la web: {entrada}"
+salida = "contenido"
+
+[[habilidad.pasos]]
+herramienta = "pensar"
+plantilla = "Resume en 5 a 7 puntos clave este contenido web: {contenido}"
+salida = "resumen"

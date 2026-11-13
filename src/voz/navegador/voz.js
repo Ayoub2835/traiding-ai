@@ -367,6 +367,80 @@ class Activacion {
 }
 
 // ---------------------------------------------------------------------------
+// Vigilante: mientras Jarvis habla, escucha el micro; si empiezas a hablar
+// (por encima del ruido durante 300 ms) avisa para cortarle e ir a escucharte.
+// El micro se abre con cancelación de eco para no confundir su propia voz.
+// ---------------------------------------------------------------------------
+class Vigilante {
+  constructor() { this._r = null; }
+
+  async iniciar(alInterrumpir, { sensibilidad = 4 } = {}) {
+    this.parar();
+    const stream = await abrirMicrofono();
+    const ctx = new AudioContext();
+    const an = ctx.createAnalyser();
+    an.fftSize = 1024;
+    ctx.createMediaStreamSource(stream).connect(an);
+    const m = new Float32Array(an.fftSize);
+    let fondo = 0, n = 0, porEncima = 0;
+    const inicio = performance.now();
+    const bucle = setInterval(() => {
+      an.getFloatTimeDomainData(m);
+      const v = rms(m);
+      if (performance.now() - inicio < 400) { fondo += v; n++; return; }
+      const umbral = Math.max(0.045, (fondo / Math.max(1, n)) * sensibilidad);
+      porEncima = v > umbral ? porEncima + 50 : Math.max(0, porEncima - 25);
+      if (porEncima >= 300) { this.parar(); alInterrumpir(); }
+    }, 50);
+    this._r = { stream, ctx, bucle };
+  }
+
+  parar() {
+    const r = this._r;
+    if (!r) return;
+    this._r = null;
+    clearInterval(r.bucle);
+    r.stream.getTracks().forEach((t) => t.stop());
+    r.ctx.close().catch(() => {});
+  }
+}
+
+// Escucha "sí" o "no" EN LOCAL (Vosk con gramática cerrada) para confirmar acciones.
+const GRAMATICA_SI_NO = JSON.stringify(['sí', 'si', 'no', 'vale', 'confirmo', 'adelante', 'cancela', 'cancelar', '[unk]']);
+async function escucharSiNo(segundos = 8) {
+  const modelo = await Vosk.cargar();
+  const stream = await abrirMicrofono();
+  const ctx = new AudioContext();
+  const fuente = ctx.createMediaStreamSource(stream);
+  const proc = ctx.createScriptProcessor(4096, 1, 1);
+  const rec = new modelo.KaldiRecognizer(ctx.sampleRate, GRAMATICA_SI_NO);
+  return new Promise((resolver) => {
+    let fin = false;
+    const terminar = (r) => {
+      if (fin) return;
+      fin = true;
+      clearTimeout(t);
+      try { proc.disconnect(); fuente.disconnect(); } catch (_) {}
+      stream.getTracks().forEach((x) => x.stop());
+      ctx.close().catch(() => {});
+      try { rec.remove(); } catch (_) {}
+      resolver(r);
+    };
+    rec.on('result', (msg) => {
+      const tx = (msg.result && msg.result.text) || '';
+      // Sin \b: no funciona con letras acentuadas como la "í" de "sí".
+      const palabras = tx.split(/\s+/);
+      if (palabras.some((p) => ['no', 'cancela', 'cancelar'].includes(p))) terminar('no');
+      else if (palabras.some((p) => ['sí', 'si', 'vale', 'confirmo', 'adelante'].includes(p))) terminar('si');
+    });
+    proc.onaudioprocess = (ev) => { try { rec.acceptWaveform(ev.inputBuffer); } catch (_) {} };
+    fuente.connect(proc);
+    proc.connect(ctx.destination);
+    const t = setTimeout(() => terminar(null), segundos * 1000);
+  });
+}
+
+// ---------------------------------------------------------------------------
 // Boca de respaldo: voz de Windows (solo si n8n no devuelve audio)
 // ---------------------------------------------------------------------------
 class Boca {
@@ -448,5 +522,5 @@ function limpiarParaVoz(texto) {
     .trim();
 }
 
-window.VozJarvis = { Grabadora, Reproductor, Pitidos, Vosk, Activacion, Boca, limpiarParaVoz, PATRON_ACTIVACION };
+window.VozJarvis = { Grabadora, Reproductor, Pitidos, Vosk, Activacion, Vigilante, escucharSiNo, Boca, limpiarParaVoz, PATRON_ACTIVACION, abrirMicrofono, rms };
 })();

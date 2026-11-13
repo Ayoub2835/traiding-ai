@@ -12,7 +12,11 @@ const POR_DEFECTO = {
   volumen: 0.9,            // 0..1
   nombreVoz: '',           // voz de Windows de RESPALDO ('' = la primera en español)
   conversacion: true,      // vuelve a escuchar tras responder
-  activacion: false,       // palabra de activación "Jarvis" (escucha local con Vosk)
+  activacion: true,        // escucha siempre la palabra "Jarvis" (en local, con Vosk)
+  modoVoz: 'auto',         // auto = tiempo real si hay clave; clasico = grabar y transcribir; n8n
+  interrumpir: true,       // puedes cortar a Jarvis hablando mientras habla
+  avisarMovilNovedades: true, // ideas/informes nuevos de n8n también al móvil (ntfy)
+  carpetaTrabajo: '',      // carpeta de las "manos" ('' = Documentos\Jarvis)
   arranqueAutomatico: null,// null = aún no se ha preguntado
   sessionId: '',           // id de sesión para la memoria del chat en n8n
   idsVistos: [],           // elementos del panel ya notificados

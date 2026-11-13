@@ -2,4 +2,9 @@ node_modules/
 dist/
 modelo/
 *.log
+logs/
+# Claves y configuración privada (el repositorio es PÚBLICO)
 config.json
+.env
+.env.*
+!.env.ejemplo

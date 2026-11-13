@@ -5,7 +5,7 @@
   <!-- Política de seguridad: solo recursos propios de la app; nada externo. -->
   <meta http-equiv="Content-Security-Policy"
         content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval' 'unsafe-eval'; worker-src 'self' blob: data:;
-                 connect-src 'self' jarvis: blob: data:; style-src 'self' 'unsafe-inline'; img-src 'self' data:;
+                 connect-src 'self' jarvis: blob: data: https://api.openai.com; style-src 'self' 'unsafe-inline'; img-src 'self' data:;
                  media-src 'self' blob: data:; font-src 'self' jarvis:">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Jarvis</title>
@@ -60,6 +60,9 @@
       <nav class="pestanas">
         <button data-pestana="pendiente" class="activa">PENDIENTE <span class="contador" id="contPendiente">0</span></button>
         <button data-pestana="memoria">MEMORIA</button>
+        <button data-pestana="tareas">TAREAS <span class="contador oculto" id="contTareas">0</span></button>
+        <button data-pestana="habilidades">HABILIDADES</button>
+        <button data-pestana="rutinas">RUTINAS</button>
         <button data-pestana="ajustes">AJUSTES</button>
       </nav>
 
@@ -73,6 +76,38 @@
           <button id="btnRevisar">↻ Revisar ahora</button>
         </div>
         <div class="lista" id="listaMemoria"></div>
+        <h3 class="subtitulo-panel">LO QUE RECUERDO (LOCAL)</h3>
+        <div class="lista" id="listaHechos"></div>
+      </div>
+
+      <div class="contenido-pestana oculto" id="pestana-tareas">
+        <form class="mini-form" id="formTarea" autocomplete="off">
+          <input id="textoTarea" type="text" dir="auto" placeholder="Nueva tarea para las manos (Claude Code)…">
+          <button type="submit">＋</button>
+        </form>
+        <div class="lista" id="listaTareas"></div>
+      </div>
+
+      <div class="contenido-pestana oculto" id="pestana-habilidades">
+        <p class="nota">Di «Jarvis, aprende a …» para enseñarle una habilidad nueva.</p>
+        <div class="lista" id="listaHabilidades"></div>
+      </div>
+
+      <div class="contenido-pestana oculto" id="pestana-rutinas">
+        <div class="lista" id="listaRutinas"></div>
+        <details class="nueva-rutina">
+          <summary>＋ Nuevo monitor</summary>
+          <form id="formMonitor" autocomplete="off">
+            <input id="monNombre" type="text" placeholder="Nombre (p. ej. Precio gasoil)" required>
+            <textarea id="monInstruccion" dir="auto" rows="3" placeholder="Qué debe vigilar (solo vigilar y avisar)" required></textarea>
+            <div class="fila">
+              <select id="monTipo"><option value="cada">Cada</option><option value="diario">Cada día a las</option></select>
+              <input id="monValor" type="text" value="240" title="Minutos (≥15) o HH:MM">
+              <select id="monAviso"><option value="movil">Aviso al móvil</option><option value="notificacion">Solo notificación</option><option value="llamada">Llamada si es urgente</option></select>
+            </div>
+            <button type="submit">Guardar monitor</button>
+          </form>
+        </details>
       </div>
 
       <div class="contenido-pestana oculto" id="pestana-ajustes">
@@ -91,8 +126,21 @@
         <label class="ajuste">Modo conversación (vuelve a escuchar solo)
           <input type="checkbox" id="ajConversacion">
         </label>
-        <label class="ajuste">Palabra de activación «Jarvis» (sin conexión)
+        <label class="ajuste">Escuchar siempre la palabra «Jarvis» (sin conexión)
           <input type="checkbox" id="ajActivacion">
+        </label>
+        <label class="ajuste">Interrumpirle hablando mientras habla
+          <input type="checkbox" id="ajInterrumpir">
+        </label>
+        <label class="ajuste">Modo de voz
+          <select id="ajModoVoz">
+            <option value="auto">Tiempo real si hay clave (recomendado)</option>
+            <option value="clasico">Grabar y transcribir (OpenAI)</option>
+            <option value="n8n">Solo n8n (como antes)</option>
+          </select>
+        </label>
+        <label class="ajuste">Ideas e informes nuevos también al móvil
+          <input type="checkbox" id="ajMovil">
         </label>
         <label class="ajuste">Voz de respaldo (si n8n no da audio)
           <select id="ajNombreVoz"></select>
@@ -104,7 +152,10 @@
           <button id="btnProbarVoz">Probar voz</button>
           <button id="btnProbarNotif">Probar notificación</button>
           <button id="btnConexion">Cambiar conexión con n8n</button>
+          <button id="btnClaves">Claves y servicios</button>
+          <button id="btnRegistro">Registro de acciones</button>
         </div>
+        <div class="servicios" id="servicios"></div>
         <p class="nota" id="notaAtajo"></p>
         <p class="nota">Los ajustes se guardan solos.</p>
       </div>
@@ -136,9 +187,49 @@
     </form>
   </div>
 
+  <!-- Claves y servicios -->
+  <div class="capa oculto" id="capaClaves">
+    <div class="tarjeta-conexion tarjeta-ancha">
+      <h1>CLAVES Y SERVICIOS</h1>
+      <p class="nota">Se guardan solo en este PC (%APPDATA%\Jarvis\.env). Deja vacío lo que no uses. Las secretas se muestran ocultas: escribe encima para cambiarlas.</p>
+      <div id="listaClaves"></div>
+      <div class="ajuste-botones">
+        <button type="button" id="clGuardar">Guardar</button>
+        <button type="button" id="clCerrar">Cerrar</button>
+      </div>
+      <p class="nota" id="clMensaje"></p>
+    </div>
+  </div>
+
+  <!-- Registro de acciones -->
+  <div class="capa oculto" id="capaRegistro">
+    <div class="tarjeta-conexion tarjeta-ancha">
+      <h1>REGISTRO DE ACCIONES</h1>
+      <p class="nota">logs\acciones.log — todo lo que Jarvis ha hecho o ha pedido permiso para hacer.</p>
+      <div class="registro" id="listaRegistro"></div>
+      <div class="ajuste-botones"><button type="button" id="rgCerrar">Cerrar</button></div>
+    </div>
+  </div>
+
+  <!-- Confirmación de seguridad -->
+  <div class="capa capa-alerta oculto" id="capaConfirmar">
+    <div class="tarjeta-conexion tarjeta-alerta">
+      <h1>✋ JARVIS PIDE PERMISO</h1>
+      <p class="cf-categoria" id="cfCategoria"></p>
+      <p class="cf-descripcion" id="cfDescripcion" dir="auto"></p>
+      <p class="nota" id="cfVoz">Di «sí» o «no».</p>
+      <div class="ajuste-botones">
+        <button type="button" id="cfSi">Sí, adelante</button>
+        <button type="button" id="cfNo">No</button>
+      </div>
+    </div>
+  </div>
+
   <script src="jarvis://app/vendor/vosk.js"></script>
-  <script src="voz.js"></script>
+  <script src="jarvis://app/voz/voz.js"></script>
+  <script src="jarvis://app/voz/tiempo-real.js"></script>
   <script src="nucleo.js"></script>
+  <script src="pestanas.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

@@ -11,5 +11,19 @@
   "revisarPanelCadaMinutos": 5,
   "atajoGlobal": "CommandOrControl+Space",
   "idiomaVoz": "es-ES",
-  "silencioParaCortarSegundos": 1.5
+  "silencioParaCortarSegundos": 1.5,
+  "noticias": [
+    {
+      "nombre": "El País",
+      "url": "https://feeds.elpais.com/mrss-s/pages/ep/site/elpais.com/portada"
+    },
+    {
+      "nombre": "France 24 (FR)",
+      "url": "https://www.france24.com/fr/rss"
+    },
+    {
+      "nombre": "Al Jazeera (AR)",
+      "url": "https://www.aljazeera.net/aljazeerarss/a7c186be-1baa-4bd4-9d80-a84db769f779/73d0e1b4-532f-45ef-b135-bfdff8b8cab9"
+    }
+  ]
 }

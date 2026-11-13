@@ -158,3 +158,71 @@ html, body {
   .centro { grid-column: 1 / -1; }
   #nucleo { width: min(70vw, 40vh); }
 }
+
+/* ===================== Jarvis v2 ===================== */
+/* 6 pestañas: dos filas de tres */
+.pestanas { flex-wrap: wrap; }
+.pestanas button { flex: 1 0 33%; padding: 10px 4px; }
+
+/* Quién contestó */
+.msg .motor { display: block; margin-top: 6px; font-size: 10px; letter-spacing: 0.12em; color: var(--led); opacity: 0.75; text-transform: uppercase; }
+
+/* Chips de estado */
+.chip { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; border: 1px solid currentColor; }
+.chip.azul { color: #4fc3ff; } .chip.verde { color: var(--ok); } .chip.rojo { color: var(--error); }
+.chip.ambar { color: #ffc14d; animation: latidoTexto 1.2s infinite; } .chip.gris { color: var(--texto-suave); }
+
+.tarea-cab { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.tarea .progreso { margin: 6px 0; padding-left: 8px; border-left: 2px solid var(--led-suave); }
+.tarea .progreso .linea { font-size: 11px; color: #a9c7cf; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.detalle.resultado { color: var(--texto); max-height: none; }
+.detalle.error { color: #ffb3c0; }
+.tarjeta button, .tarjeta .ajuste-botones button { margin-top: 8px; }
+button.peligro { border-color: rgba(255, 59, 92, 0.5) !important; color: #ffb3c0 !important; }
+button.mini { padding: 3px 8px !important; font-size: 11px !important; }
+.tarjeta button { background: transparent; color: var(--texto); border: 1px solid var(--led-suave); padding: 5px 10px; border-radius: 4px; cursor: pointer; font-size: 12px; }
+
+.mini-form { display: flex; gap: 6px; margin-bottom: 12px; }
+.mini-form input { flex: 1; background: #000; color: var(--texto); border: 1px solid var(--led-suave); border-radius: 6px; padding: 8px 10px; font-size: 13px; }
+.mini-form button { background: transparent; border: 1px solid var(--led); color: var(--led); border-radius: 6px; padding: 0 12px; cursor: pointer; }
+.subtitulo-panel { font-size: 11px; letter-spacing: 0.3em; color: var(--led); margin: 18px 0 10px; font-weight: 600; }
+
+.nueva-rutina { margin-top: 12px; font-size: 13px; }
+.nueva-rutina summary { cursor: pointer; color: var(--led); }
+.nueva-rutina form { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+.nueva-rutina input, .nueva-rutina textarea, .nueva-rutina select { background: #000; color: var(--texto); border: 1px solid var(--led-suave); border-radius: 6px; padding: 7px; font: inherit; font-size: 12px; }
+.nueva-rutina .fila { display: flex; gap: 6px; }
+.nueva-rutina .fila > * { flex: 1; min-width: 0; }
+.nueva-rutina button { background: transparent; border: 1px solid var(--led); color: var(--led); border-radius: 6px; padding: 8px; cursor: pointer; }
+
+/* Estado de servicios en Ajustes */
+.servicios { margin-top: 14px; display: flex; flex-direction: column; gap: 6px; }
+.servicio { font-size: 12px; display: flex; align-items: baseline; gap: 6px; }
+.servicio .punto { width: 7px; height: 7px; border-radius: 50%; background: #888; flex: none; }
+.servicio.ok .punto { background: var(--ok); box-shadow: 0 0 6px var(--ok); }
+.servicio.mal .punto { background: #ffc14d; }
+
+/* Claves */
+.tarjeta-ancha { width: min(860px, 100%); max-height: 90vh; overflow-y: auto; }
+.grupo-claves { border-top: 1px solid var(--led-suave); padding: 8px 0; }
+.grupo-claves summary { cursor: pointer; color: var(--led); letter-spacing: 0.3em; font-size: 12px; padding: 4px 0; }
+.fila-clave { display: grid; grid-template-columns: 1.2fr 1.6fr auto; gap: 6px 10px; align-items: center; padding: 6px 0; }
+.fila-clave label { font-size: 12px; }
+.fila-clave input { background: #000; color: var(--texto); border: 1px solid var(--led-suave); border-radius: 6px; padding: 7px; font-size: 12px; }
+.fila-clave small, .fila-clave .meta { grid-column: 1 / -1; font-size: 11px; }
+.fila-clave small.ok { color: var(--ok); } .fila-clave small.mal { color: var(--error); }
+.fila-clave button { background: transparent; border: 1px solid var(--led-suave); color: var(--texto); border-radius: 4px; cursor: pointer; }
+
+/* Registro */
+.registro { display: flex; flex-direction: column; gap: 4px; font-size: 12px; max-height: 60vh; overflow-y: auto; user-select: text; }
+.linea-registro { display: flex; gap: 8px; align-items: baseline; padding: 4px 0; border-bottom: 1px solid rgba(255, 255, 255, 0.05); }
+.linea-registro.mal { color: #ffb3c0; } .linea-registro.ok .chip { color: var(--ok); }
+
+/* Confirmación de seguridad */
+.capa-alerta { z-index: 30; background: rgba(20, 0, 5, 0.9); }
+.tarjeta-alerta { border-color: #ffc14d; box-shadow: 0 0 50px rgba(255, 193, 77, 0.35); }
+.tarjeta-alerta h1 { color: #ffc14d; text-shadow: 0 0 12px #ffc14d; }
+.cf-categoria { font-size: 13px; letter-spacing: 0.3em; color: #ffc14d; margin: 0; }
+.cf-descripcion { font-size: 16px; line-height: 1.5; margin: 0; user-select: text; word-break: break-word; }
+#cfSi { border-color: var(--ok); color: var(--ok); font-size: 15px; padding: 10px 20px; }
+#cfNo { border-color: var(--error); color: var(--error); font-size: 15px; padding: 10px 20px; }

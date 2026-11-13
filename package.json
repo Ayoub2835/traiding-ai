@@ -1,8 +1,8 @@
 {
   "name": "jarvis",
   "productName": "Jarvis",
-  "version": "1.0.0",
-  "description": "Jarvis: asistente personal de escritorio conectado a n8n",
+  "version": "2.0.0",
+  "description": "Jarvis v2: asistente personal de escritorio (voz, cerebro local/Claude, manos con Claude Code, habilidades, rutinas)",
   "main": "src/main.js",
   "author": "Ayoub",
   "license": "UNLICENSED",
@@ -11,10 +11,13 @@
     "modelo": "node scripts/preparar-modelo.js",
     "start": "electron .",
     "compilar": "npm run modelo && electron-builder --win nsis --x64",
-    "probar-n8n": "node scripts/probar-n8n.js"
+    "probar-n8n": "node scripts/probar-n8n.js",
+    "test": "node --test --test-force-exit \"test/*.test.js\""
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^1.8.0",
     "@fontsource/noto-sans-arabic": "^5.3.0",
+    "smol-toml": "^1.9.1",
     "vosk-browser": "^0.0.8"
   },
   "devDependencies": {
@@ -47,6 +50,14 @@
         "filter": [
           "modelo-es.tar.gz"
         ]
+      },
+      {
+        "from": "NOTICE",
+        "to": "NOTICE"
+      },
+      {
+        "from": "LICENSES",
+        "to": "LICENSES"
       }
     ],
     "win": {
@@ -74,6 +85,9 @@
       "uninstallerIcon": "assets/icon.ico",
       "uninstallDisplayName": "Jarvis",
       "artifactName": "Jarvis-Setup-${version}.exe"
-    }
+    },
+    "asarUnpack": [
+      "src/manos/permisos-mcp.js"
+    ]
   }
 }

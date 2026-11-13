@@ -1,9 +1,11 @@
-// Lógica de la interfaz de Jarvis: conexión, saludo, voz, chat, paneles y ajustes.
+// Lógica de la interfaz de Jarvis v2: conexión, saludo, voz, chat, paneles y ajustes.
+// Las pestañas nuevas (Tareas, Habilidades, Rutinas), las claves y las
+// confirmaciones están en pestanas.js.
 'use strict';
 
 const $ = (id) => document.getElementById(id);
 const api = window.jarvis;
-const { Grabadora, Reproductor, Pitidos, Vosk, Activacion, Boca } = window.VozJarvis;
+const { Grabadora, Reproductor, Pitidos, Vosk, Activacion, Vigilante, Boca } = window.VozJarvis;
 
 const estado = {
   info: null,
@@ -16,12 +18,26 @@ const estado = {
   atajo: { ultimo: 0, mantenido: false, vigilante: null },
   hablando: false,     // Jarvis está hablando (voz de n8n o de respaldo)
   turno: 0,             // sube al pulsar Parar: se descartan respuestas que lleguen tarde
+  modoVoz: 'n8n',       // realtime-openai | realtime-gemini | openai | n8n (lo decide el proceso principal)
 };
 
 const nucleo = new window.Nucleo($('nucleo'));
 const grabadora = new Grabadora();
 const reproductor = new Reproductor();
 const activacion = new Activacion(() => alOirActivacion());
+const vigilante = new Vigilante(); // para interrumpir a Jarvis hablando
+const tiempoReal = new window.TiempoReal({
+  alNivel: (n) => nucleo.setNivel(n),
+  alTexto: (rol, t) => añadirMensaje(rol === 'error' ? 'error' : rol, t, rol === 'jarvis' ? 'Tiempo real' : null),
+  alEstado: (e) => ponerEstadoVoz(e, /HABLANDO/.test(e) ? 'hablando' : /PROCESANDO/.test(e) ? 'pensando' : 'escuchando'),
+  alHerramienta: (r) => { if (r.tareaId) window.Pestanas?.avisoTarea(); },
+  alFin: (motivo) => {
+    estado.conversando = false;
+    if (motivo === 'inactividad') añadirMensaje('sistema', 'Tiempo real cerrado por inactividad.');
+    reposo();
+    reanudarActivacion();
+  },
+});
 let boca = null; // voz de Windows, solo de respaldo
 
 // Frases para terminar la conversación (es / fr / darija).
@@ -59,11 +75,19 @@ function mostrarError(mensaje) {
   setTimeout(() => { if (nucleo.estado === 'error') reposo(); }, 2500);
 }
 
-function añadirMensaje(quien, texto) {
+function añadirMensaje(quien, texto, motor) {
   const div = document.createElement('div');
   div.className = `msg ${quien}`;
   div.dir = 'auto'; // el árabe se muestra de derecha a izquierda automáticamente
   div.textContent = texto;
+  // Quién contestó: Ollama, Claude, n8n, manos, habilidad…
+  if (motor) {
+    const m = document.createElement('span');
+    m.className = 'motor';
+    m.dir = 'ltr';
+    m.textContent = `vía ${motor}`;
+    div.appendChild(m);
+  }
   $('chat').appendChild(div);
   $('chat').scrollTop = $('chat').scrollHeight;
 }
@@ -98,7 +122,17 @@ async function decir({ texto, audioBase64 }) {
   ponerEstadoVoz('HABLANDO', 'hablando');
   actualizarBotones();
   const alNivel = (n) => nucleo.setNivel(n);
+  // Si puedes interrumpirle, el micro escucha mientras habla.
+  if (estado.ajustes.interrumpir && estado.conversando) {
+    vigilante.iniciar(() => { estado.interrumpido = true; reproductor.parar(); boca.callar(); }).catch(() => {});
+  }
   try {
+    // Sin audio de n8n: voz de OpenAI si hay clave; si no, la de Windows.
+    if (!audioBase64 && texto) {
+      const s = await api.llamar('voz.sintetizar', texto).catch(() => null);
+      if (s && s.audioBase64) audioBase64 = s.audioBase64;
+      else if (s && s.error) console.warn(s.error);
+    }
     if (audioBase64) {
       await reproductor.reproducir(audioBase64, { volumen: estado.ajustes.volumen, alNivel });
     } else {
@@ -107,6 +141,7 @@ async function decir({ texto, audioBase64 }) {
   } catch (e) {
     mostrarError(e.message);
   } finally {
+    vigilante.parar();
     estado.hablando = false;
     reposo();
   }
@@ -118,6 +153,8 @@ function pararTodo() {
   estado.conversando = false;
   reproductor.parar();
   if (boca) boca.callar();
+  vigilante.parar();
+  if (tiempoReal.activo) tiempoReal.parar('parado');
   if (estado.grabando) grabadora.cancelar();
   nucleo.setNivel(0);
   reposo();
@@ -125,8 +162,26 @@ function pararTodo() {
 }
 
 // ---------------------------------------------------------------------------
-// Preguntar a Jarvis por el endpoint de voz (con respaldo si falla)
+// Preguntar a Jarvis
+//   texto escrito o voz transcrita → cerebro (router: Ollama / Claude / n8n /
+//   manos / habilidades) → respuesta con el motor que contestó → voz.
+//   Modo de voz "n8n" (sin claves): tu voz va al endpoint de voz de n8n, como antes.
 // ---------------------------------------------------------------------------
+async function responderTexto(texto, origen, turno) {
+  const r = await api.llamar('cerebro.responder', texto, origen);
+  if (turno !== estado.turno) return false; // se pulsó Parar mientras pensaba
+  if (!r.ok) {
+    añadirMensaje('error', '⚠ ' + r.error);
+    mostrarError(r.error);
+    return false;
+  }
+  añadirMensaje('jarvis', r.texto, r.motor);
+  if (r.tareaId) window.Pestanas?.avisoTarea();
+  estado.ocupado = false;
+  await decir({ texto: r.texto });
+  return true;
+}
+
 /**
  * @param {{texto?: string, blob?: Blob, mime?: string}} entrada
  * @returns {Promise<boolean>} true si Jarvis respondió
@@ -139,21 +194,32 @@ async function preguntar(entrada) {
   ponerEstadoVoz('PROCESANDO…', 'pensando');
   actualizarBotones();
   try {
-    const datos = entrada.blob
-      ? { audio: await entrada.blob.arrayBuffer(), mime: entrada.mime }
-      : { texto: entrada.texto };
-    const r = await api.enviarVoz(datos);
-    if (turno !== estado.turno) return false; // se pulsó Parar mientras pensaba
-    if (r.ok) {
-      marcarRed(true);
-      if (entrada.blob) añadirMensaje('yo', r.pregunta || '(audio)');
-      $('transcripcion').textContent = entrada.blob ? r.pregunta : '';
-      añadirMensaje('jarvis', r.respuesta);
-      estado.ocupado = false;
-      await decir({ texto: r.respuesta, audioBase64: r.audioBase64 });
-      return true;
+    if (entrada.texto) return await responderTexto(entrada.texto, 'texto', turno);
+
+    const audio = await entrada.blob.arrayBuffer();
+    if (estado.modoVoz === 'n8n') {
+      // Flujo de siempre: n8n entiende, piensa y habla.
+      const r = await api.enviarVoz({ audio, mime: entrada.mime });
+      if (turno !== estado.turno) return false;
+      if (r.ok) {
+        marcarRed(true);
+        añadirMensaje('yo', r.pregunta || '(audio)');
+        $('transcripcion').textContent = r.pregunta;
+        añadirMensaje('jarvis', r.respuesta, 'n8n · voz');
+        estado.ocupado = false;
+        await decir({ texto: r.respuesta, audioBase64: r.audioBase64 });
+        return true;
+      }
+      return await respaldo(entrada, `Voz de n8n: ${r.error}`, turno);
     }
-    return await respaldo(entrada, r.error, turno);
+    // Con OpenAI: transcribir (cualquier idioma) y pasar por el router.
+    const t = await api.llamar('voz.transcribir', audio, entrada.mime);
+    if (turno !== estado.turno) return false;
+    if (!t.ok) return await respaldo(entrada, t.error, turno);
+    if (!t.texto) { ponerEstadoVoz('NO TE HE ENTENDIDO', 'reposo'); return false; }
+    añadirMensaje('yo', t.texto);
+    $('transcripcion').textContent = t.texto;
+    return await responderTexto(t.texto, 'voz', turno);
   } catch (e) {
     return await respaldo(entrada, e.message || String(e), turno);
   } finally {
@@ -162,40 +228,26 @@ async function preguntar(entrada) {
   }
 }
 
-// Respaldo: si la voz de n8n falla, se transcribe en local con Vosk (español)
-// y se pregunta al chat de texto; se responde con la voz de Windows.
+// Respaldo sin conexión: Vosk transcribe en local (español) y pasa por el router.
 async function respaldo(entrada, motivo, turno) {
-  mostrarError('Voz de n8n: ' + motivo);
+  mostrarError(motivo);
   añadirMensaje('error', '⚠ ' + motivo + ' — probando el modo de respaldo…');
-  let texto = entrada.texto;
-  if (!texto && entrada.blob) {
-    ponerEstadoVoz('RESPALDO LOCAL…', 'pensando');
-    try {
-      texto = await Vosk.transcribir(entrada.blob);
-    } catch (e) {
-      añadirMensaje('error', '⚠ ' + e.message);
-      return false;
-    }
-    if (!texto) {
-      añadirMensaje('error', '⚠ El respaldo local no entendió nada (solo entiende español).');
-      return false;
-    }
-    añadirMensaje('yo', texto);
-    $('transcripcion').textContent = texto;
-  }
-  const r = await api.enviarMensaje(texto);
-  if (turno !== estado.turno) return false;
-  if (!r.ok) {
-    marcarRed(false, r.error);
-    añadirMensaje('error', '⚠ Chat: ' + r.error);
-    mostrarError('Sin conexión con n8n: ' + r.error);
+  if (!entrada.blob) return false;
+  ponerEstadoVoz('RESPALDO LOCAL…', 'pensando');
+  let texto;
+  try {
+    texto = await Vosk.transcribir(entrada.blob);
+  } catch (e) {
+    añadirMensaje('error', '⚠ ' + e.message);
     return false;
   }
-  marcarRed(true);
-  añadirMensaje('jarvis', r.respuesta);
-  estado.ocupado = false;
-  await decir({ texto: r.respuesta });
-  return true;
+  if (!texto) {
+    añadirMensaje('error', '⚠ El respaldo local no entendió nada (solo entiende español).');
+    return false;
+  }
+  añadirMensaje('yo', texto);
+  $('transcripcion').textContent = texto;
+  return responderTexto(texto, 'voz-respaldo', turno);
 }
 
 $('formChat').addEventListener('submit', async (e) => {
@@ -216,16 +268,33 @@ async function conversar() {
     if (estado.grabando) grabadora.detener(); else pararTodo();
     return;
   }
+  if (tiempoReal.activo) { tiempoReal.parar('parado'); return; }
   if (!estado.conectado) return abrirConexion();
   reproductor.parar();
   if (boca) boca.callar();
   activacion.pausar();
   estado.conversando = true;
+  // Tiempo real (OpenAI Realtime / Gemini Live) si hay clave.
+  if (estado.modoVoz.startsWith('realtime')) {
+    try {
+      Pitidos.empezar(estado.ajustes.volumen);
+      ponerEstadoVoz('CONECTANDO…', 'pensando');
+      await tiempoReal.iniciar(estado.modoVoz);
+      actualizarBotones();
+      return;
+    } catch (e) {
+      mostrarError(`Tiempo real no disponible (${e.message}). Sigo en modo normal.`);
+      // OpenAI sin tiempo real → grabar y transcribir; Gemini → n8n.
+      estado.modoVoz = estado.modoVoz === 'realtime-openai' ? 'openai' : 'n8n';
+      estado.conversando = true;
+    }
+  }
   try {
     while (estado.conversando) {
       const g = await grabarFrase();
       if (!estado.conversando || !g || g.cancelada) break;
       if (!g.hablado) { ponerEstadoVoz('NO TE HE OÍDO', 'reposo'); break; }
+      estado.interrumpido = false;
       const ok = await preguntar({ blob: g.blob, mime: g.mime });
       const ultimo = [...document.querySelectorAll('.msg.yo')].pop();
       if (!ok || !estado.ajustes.conversacion) break;
@@ -476,6 +545,9 @@ function pintarAjustes() {
   $('ajVolumenValor').textContent = Math.round(a.volumen * 100) + '%';
   $('ajConversacion').checked = a.conversacion;
   $('ajActivacion').checked = !!a.activacion;
+  $('ajInterrumpir').checked = !!a.interrumpir;
+  $('ajModoVoz').value = a.modoVoz || 'auto';
+  $('ajMovil').checked = !!a.avisarMovilNovedades;
   $('ajArranque').checked = !!estado.info.arrancaConWindows;
   $('filaArranque').classList.toggle('oculto', !estado.info.puedeArrancarSolo);
   aplicarColor(a.colorLed);
@@ -510,6 +582,9 @@ $('ajVolumen').addEventListener('change', (e) => guardar({ volumen: Number(e.tar
 $('ajNombreVoz').addEventListener('change', (e) => guardar({ nombreVoz: e.target.value }));
 $('ajConversacion').addEventListener('change', (e) => guardar({ conversacion: e.target.checked }));
 $('ajActivacion').addEventListener('change', (e) => guardar({ activacion: e.target.checked }));
+$('ajInterrumpir').addEventListener('change', (e) => guardar({ interrumpir: e.target.checked }));
+$('ajMovil').addEventListener('change', (e) => guardar({ avisarMovilNovedades: e.target.checked }));
+$('ajModoVoz').addEventListener('change', async (e) => { await guardar({ modoVoz: e.target.value }); await window.__actualizarModoVoz(); window.Pestanas?.pintarServicios(); });
 $('ajArranque').addEventListener('change', (e) => guardar({ arranqueAutomatico: e.target.checked }));
 $('btnProbarVoz').addEventListener('click', () => {
   if (!estado.ajustes.voz) return mostrarError('La voz está desactivada en Ajustes.');
@@ -610,6 +685,8 @@ async function iniciar() {
   pintarVoces();
   speechSynthesis.addEventListener('voiceschanged', pintarVoces);
   ponerEstadoVoz('EN ESPERA', 'reposo');
+  estado.modoVoz = await api.llamar('voz.modo');
+  window.Pestanas?.iniciar({ añadirMensaje, mostrarError, decir, pararTodo, estado, activacion, reanudarActivacion, abrirConexion });
 
   if (estado.info.errorConfig) mostrarError('Configuración: ' + estado.info.errorConfig);
   $('notaAtajo').textContent = estado.info.atajo.ok
@@ -641,4 +718,6 @@ async function iniciar() {
 iniciar().catch((e) => mostrarError('Error al iniciar: ' + e.message));
 
 // Para pruebas automáticas (no se usa en el uso normal).
-window.__jarvis = { estado, nucleo, grabadora, reproductor, activacion, Vosk, get boca() { return boca; }, textoSaludo, preguntar, conversar, pararTodo };
+window.__jarvis = { estado, nucleo, grabadora, reproductor, activacion, vigilante, tiempoReal, Vosk, get boca() { return boca; }, textoSaludo, preguntar, conversar, pararTodo, decir, añadirMensaje };
+// Cuando cambian claves o el modo de voz, se recalcula el modo.
+window.__actualizarModoVoz = async () => { estado.modoVoz = await api.llamar('voz.modo'); };

@@ -23,6 +23,10 @@ contextBridge.exposeInMainWorld('jarvis', {
   pantallaCompleta: () => ipcRenderer.send('ventana:pantallaCompleta'),
   notificacionPrueba: () => ipcRenderer.send('notificar:prueba'),
 
+  // Jarvis v2: acciones de cerebro, voz, manos, habilidades, rutinas, claves…
+  llamar: (accion, ...args) => ipcRenderer.invoke('jarvis:accion', accion, ...args),
+  alEvento: escuchar('jarvis:evento'),
+
   // Eventos que llegan desde el proceso principal
   alPedirEscuchar: escuchar('voz:escuchar'),
   alActualizarPanel: escuchar('panel:actualizado'),

@@ -14,7 +14,7 @@ const path = require('path');
 const { app } = require('electron');
 
 const CAMPOS_URL = ['chatUrl', 'panelUrl', 'vozUrl'];
-const RAIZ = path.join(__dirname, '..');
+const RAIZ = path.join(__dirname, '..', '..');
 
 const rutaConexion = () => path.join(app.getPath('userData'), 'conexion.json');
 

@@ -1,0 +1,24 @@
+# Adaptado de OpenJarvis — src/openjarvis/skills/data/daily-digest.toml
+# Copyright 2025 The OpenJarvis Authors. Licencia Apache 2.0 (ver NOTICE).
+# Cambios: traducido al español y adaptado a las herramientas de Jarvis.
+[habilidad]
+nombre = "resumen-diario"
+descripcion = "Resumen del día con lo guardado en memoria y la actividad reciente"
+version = "1.0.0"
+autor = "OpenJarvis (adaptado)"
+disparadores = ["resumen del día", "resumen de hoy", "qué ha pasado hoy", "résumé de la journée"]
+
+[[habilidad.pasos]]
+herramienta = "memoria_buscar"
+plantilla = "actividad reciente tareas decisiones {fecha}"
+salida = "recientes"
+
+[[habilidad.pasos]]
+herramienta = "n8n"
+plantilla = "Dame solo datos, sin opinar: ideas, informes y oportunidades nuevas de hoy ({fecha})."
+salida = "n8n_hoy"
+
+[[habilidad.pasos]]
+herramienta = "pensar"
+plantilla = "Con estos datos, haz un resumen breve del día en secciones: Lo importante, Hecho, Pendiente, Próximas fechas. Solo datos, nada inventado. Datos de memoria: {recientes}. Datos de n8n: {n8n_hoy}"
+salida = "resumen"

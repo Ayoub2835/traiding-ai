@@ -1,0 +1,24 @@
+# Adaptado de OpenJarvis — src/openjarvis/skills/data/todo-from-notes.toml
+# Copyright 2025 The OpenJarvis Authors. Licencia Apache 2.0 (ver NOTICE).
+# Cambios: traducido; las tareas encontradas se guardan en la memoria de Jarvis.
+[habilidad]
+nombre = "tareas-de-notas"
+descripcion = "Saca una lista de tareas priorizada de unas notas"
+version = "1.0.0"
+autor = "OpenJarvis (adaptado)"
+disparadores = ["saca las tareas", "lista de tareas de", "tareas de estas notas", "extrae las tareas"]
+
+[[habilidad.pasos]]
+herramienta = "pensar"
+plantilla = "Identifica todas las tareas, compromisos y seguimientos de estas notas. Marca prioridad (alta/media/baja). Notas: {entrada}"
+salida = "tareas"
+
+[[habilidad.pasos]]
+herramienta = "memoria_guardar"
+plantilla = "Tareas sacadas de notas ({fecha}): {tareas}"
+salida = "guardado"
+
+[[habilidad.pasos]]
+herramienta = "pensar"
+plantilla = "Presenta estas tareas como lista ordenada por prioridad, breve: {tareas}"
+salida = "lista"

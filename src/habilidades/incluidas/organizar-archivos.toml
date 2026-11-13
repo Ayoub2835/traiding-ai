@@ -1,0 +1,14 @@
+# Adaptado de OpenJarvis — src/openjarvis/skills/data/file-organizer.toml
+# Copyright 2025 The OpenJarvis Authors. Licencia Apache 2.0 (ver NOTICE).
+# Cambios: traducido; se hace con Claude Code (manos), sin borrar nada.
+[habilidad]
+nombre = "organizar-archivos"
+descripcion = "Ordena los archivos de una carpeta por tipo (imágenes, documentos, código…)"
+version = "1.0.0"
+autor = "OpenJarvis (adaptado)"
+disparadores = ["organiza la carpeta", "ordena la carpeta", "organiza mis archivos", "range le dossier"]
+
+[[habilidad.pasos]]
+herramienta = "manos"
+plantilla = "En la carpeta indicada, crea subcarpetas imagenes, documentos, codigo, comprimidos, multimedia y otros, y mueve cada archivo a la suya según su tipo. No borres nada. Al terminar, devuelve un informe breve de lo movido. Petición: {entrada}"
+salida = "informe"

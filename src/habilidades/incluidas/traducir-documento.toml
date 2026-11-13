@@ -1,0 +1,19 @@
+# Adaptado de OpenJarvis — src/openjarvis/skills/data/translate-doc.toml
+# Copyright 2025 The OpenJarvis Authors. Licencia Apache 2.0 (ver NOTICE).
+# Cambios: traducido; el archivo lo lee Claude Code y la traducción la hace Claude.
+[habilidad]
+nombre = "traducir-documento"
+descripcion = "Traduce un documento a otro idioma manteniendo el formato"
+version = "1.0.0"
+autor = "OpenJarvis (adaptado)"
+disparadores = ["traduce el documento", "traduce este archivo", "traduce el archivo", "traduis le document"]
+
+[[habilidad.pasos]]
+herramienta = "manos"
+plantilla = "Lee el archivo indicado y devuelve su contenido completo tal cual, sin cambiar nada: {entrada}"
+salida = "original"
+
+[[habilidad.pasos]]
+herramienta = "pensar_claude"
+plantilla = "Traduce este documento al idioma que pide Ayoub en su petición, conservando formato y términos técnicos. Petición: {entrada}. Documento: {original}"
+salida = "traduccion"

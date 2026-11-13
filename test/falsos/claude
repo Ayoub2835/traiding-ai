@@ -1,0 +1,35 @@
+#!/usr/bin/env node
+// Claude Code SIMULADO para pruebas: lee el prompt por stdin, arranca el servidor
+// MCP "jarvis" de --mcp-config como haría Claude Code, pide permiso para cada
+// herramienta del plan (FALSO_PLAN, JSON) y escribe eventos stream-json.
+const fs = require('fs');
+const { spawn } = require('child_process');
+const args = process.argv.slice(2);
+if (args[0] === '--version') { console.log('2.1.0 (Claude Code simulado)'); process.exit(0); }
+const cfg = JSON.parse(fs.readFileSync(args[args.indexOf('--mcp-config') + 1], 'utf8'));
+const plan = JSON.parse(process.env.FALSO_PLAN || '[]');
+const out = (o) => process.stdout.write(JSON.stringify(o) + '\n');
+let prompt = '';
+process.stdin.on('data', (d) => { prompt += d; });
+process.stdin.on('end', async () => {
+  const s = cfg.mcpServers.jarvis;
+  const mcp = spawn(s.command, s.args, { env: { ...process.env, ...s.env }, stdio: ['pipe', 'pipe', 'inherit'] });
+  let buf = ''; const esperando = new Map(); let n = 0;
+  mcp.stdout.on('data', (d) => { buf += d; const ls = buf.split('\n'); buf = ls.pop(); for (const l of ls) { if (!l) continue; const m = JSON.parse(l); esperando.get(m.id)?.(m); } });
+  const rpc = (method, params) => new Promise((r) => { const id = ++n; esperando.set(id, r); mcp.stdin.write(JSON.stringify({ jsonrpc: '2.0', id, method, params }) + '\n'); });
+  const init = await rpc('initialize', { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'falso', version: '1' } });
+  mcp.stdin.write(JSON.stringify({ jsonrpc: '2.0', method: 'notifications/initialized' }) + '\n');
+  const herramientas = await rpc('tools/list', {});
+  out({ type: 'system', subtype: 'init', mcp_servers: [{ name: 'jarvis', status: init.result ? 'connected' : 'failed' }], tools: herramientas.result.tools.map((t) => t.name) });
+  out({ type: 'assistant', message: { content: [{ type: 'text', text: `Recibido. Prompt con reglas: ${/NUNCA borres/.test(prompt)}` }] } });
+  const decisiones = [];
+  for (const paso of plan) {
+    out({ type: 'assistant', message: { content: [{ type: 'tool_use', name: paso.tool, input: paso.input }] } });
+    const r = await rpc('tools/call', { name: 'permiso', arguments: { tool_name: paso.tool, input: paso.input } });
+    const d = JSON.parse(r.result.content[0].text);
+    decisiones.push(`${paso.tool}:${d.behavior}`);
+    if (paso.esperar) await new Promise((r2) => setTimeout(r2, paso.esperar));
+  }
+  mcp.kill();
+  out({ type: 'result', subtype: 'success', is_error: false, result: `Hecho. Decisiones: ${decisiones.join(', ')}`, total_cost_usd: 0.0123 });
+});

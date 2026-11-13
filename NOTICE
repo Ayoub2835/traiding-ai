@@ -1,0 +1,24 @@
+Jarvis (app de escritorio de Ayoub)
+
+Este producto incluye software adaptado de OpenJarvis
+(https://github.com/open-jarvis/OpenJarvis)
+Copyright 2025 The OpenJarvis Authors.
+Licenciado bajo la Licencia Apache, versión 2.0. Copia de la licencia en
+LICENSES/OpenJarvis-Apache-2.0.txt y en http://www.apache.org/licenses/LICENSE-2.0
+
+Archivos adaptados de OpenJarvis (portados a JavaScript, traducidos y
+modificados; cada archivo lo indica en su cabecera):
+  - src/cerebro/complejidad.js       <- src/openjarvis/learning/routing/complexity.py
+  - src/seguridad/inyeccion.js       <- src/openjarvis/security/injection_scanner.py
+  - src/rutinas/resumen.js (reglas)  <- src/openjarvis/agents/morning_digest.py
+  - src/habilidades/incluidas/*.toml <- src/openjarvis/skills/data/{daily-digest,
+                                        email-draft,web-summarize,file-organizer,
+                                        todo-from-notes,translate-doc}.toml
+Ideas de diseño tomadas de OpenJarvis (implementación propia): router de modelos
+local/nube, formato de skills en TOML, memoria de hechos, monitor programado con
+estado, ejecución de Claude como subproceso.
+
+Otros componentes de terceros incluidos en la app instalada:
+  - Vosk / vosk-browser (Apache 2.0) y el modelo vosk-model-small-es-0.42 (Apache 2.0)
+  - Noto Sans Arabic (SIL Open Font License 1.1) vía @fontsource/noto-sans-arabic
+  - Electron (MIT), @anthropic-ai/sdk (MIT), smol-toml (BSD-3-Clause)
