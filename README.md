@@ -2,7 +2,7 @@
 
 Jarvis es una app de escritorio (Electron) que **escucha, piensa, actúa y avisa**:
 
-- **Voz**: escucha siempre la palabra «Jarvis», conversación seguida sin botón, puedes interrumpirle hablando. En tiempo real con OpenAI Realtime o Gemini Live si tienes clave; si no, con tu flujo de voz de n8n.
+- **Voz**: escucha siempre la palabra «Jarvis» desde que arranca, sin botones (Ctrl+Espacio queda como respaldo); conversación seguida y puedes interrumpirle hablando. En tiempo real con OpenAI Realtime o Gemini Live si tienes clave; si no, con tu flujo de voz de n8n.
 - **Cerebro**: un router elige quién contesta y te lo muestra en pantalla («vía Ollama · qwen2.5:3b», «vía Claude», «vía n8n»…).
 - **Manos**: hace tareas reales en tu PC con Claude Code (archivos, navegador, Shopify, n8n), con un panel de **Tareas** con estado y botón de cancelar.
 - **Habilidades**: «Jarvis, aprende a…» crea una habilidad reutilizable.
@@ -59,7 +59,7 @@ Sin ninguna clave Jarvis funciona como antes (n8n) más el modelo local de Ollam
 | Una acción real («crea un Excel…», «abre Shopify y…», «tarea: …») | Manos (Claude Code) |
 | Correos, ideas, informes, oportunidades | Tu Jarvis de n8n |
 | Algo difícil (razonar, comparar, código, cálculo) o en árabe/dárija | Claude |
-| Algo sencillo | Ollama (local, gratis) |
+| Algo sencillo | Ollama (local, gratis; si no está abierto, Jarvis lo abre solo con `ollama serve`) |
 | Comprar/vender/transferir dinero | Nadie: lo rechaza (solo vigila y avisa) |
 
 Si el elegido falla, prueba el siguiente (local → Claude → n8n).

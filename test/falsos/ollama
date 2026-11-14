@@ -1,0 +1,11 @@
+#!/usr/bin/env node
+// "ollama" SIMULADO: con "serve" levanta un servidor en OLLAMA_HOST que responde /api/tags.
+const http = require('http');
+if (process.argv[2] !== 'serve') { console.log('ollama simulado'); process.exit(0); }
+const [host, port] = (process.env.OLLAMA_HOST || '127.0.0.1:11434').split(':');
+const s = http.createServer((req, res) => {
+  res.writeHead(200, { 'Content-Type': 'application/json' });
+  res.end(JSON.stringify(req.url === '/api/tags' ? { models: [{ name: 'qwen2.5:3b' }] } : {}));
+});
+s.listen(Number(port), host);
+setTimeout(() => process.exit(0), 60000); // en las pruebas se cierra solo

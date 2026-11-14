@@ -175,7 +175,7 @@ function crearBandeja() {
 }
 function actualizarMenuBandeja() {
   if (!bandeja) return;
-  const auto = puedeArrancarSolo() ? app.getLoginItemSettings().openAtLogin : false;
+  const auto = arrancaConWindows();
   bandeja.setContextMenu(Menu.buildFromTemplate([
     { label: 'Abrir / ocultar Jarvis', click: alternarVentana },
     { label: `Hablar con Jarvis (${(cfg && cfg.atajoGlobal) || 'Ctrl+Espacio'})`, click: escucharDesdeAtajo },
@@ -197,11 +197,18 @@ function actualizarMenuBandeja() {
 // ---------------------------------------------------------------------------
 const puedeArrancarSolo = () => process.platform === 'win32' || process.platform === 'darwin';
 
-function fijarArranque(activar) {
-  if (!puedeArrancarSolo()) return;
+// En Windows, getLoginItemSettings solo encuentra la entrada si se le pasan el
+// MISMO path y args con los que se creó: si no, siempre dice que está apagada.
+function opcionesArranque() {
   // En modo desarrollo hay que pasar también la carpeta del proyecto a electron.exe.
   const args = app.isPackaged ? ['--autoarranque'] : [RAIZ, '--autoarranque'];
-  app.setLoginItemSettings({ openAtLogin: activar, path: process.execPath, args });
+  return { path: process.execPath, args };
+}
+const arrancaConWindows = () => (puedeArrancarSolo() ? app.getLoginItemSettings(opcionesArranque()).openAtLogin : false);
+
+function fijarArranque(activar) {
+  if (!puedeArrancarSolo()) return;
+  app.setLoginItemSettings({ openAtLogin: activar, ...opcionesArranque() });
   ajustes.actualizar({ arranqueAutomatico: activar });
   actualizarMenuBandeja();
   enviar('ajustes:cambiados', ajustes.paraInterfaz());
@@ -313,7 +320,7 @@ function registrarIpc() {
     atajo: estadoAtajo,
     inicioAutomatico: INICIO_AUTOMATICO,
     puedeArrancarSolo: puedeArrancarSolo(),
-    arrancaConWindows: puedeArrancarSolo() ? app.getLoginItemSettings().openAtLogin : false,
+    arrancaConWindows: arrancaConWindows(),
     version: app.getVersion(),
   }));
 

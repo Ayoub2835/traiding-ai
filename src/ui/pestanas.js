@@ -298,6 +298,7 @@ function alEvento({ tipo, datos }) {
     case 'rutinas': pintarRutinas(datos); break;
     case 'habilidades': pintarHabilidades(); break;
     case 'progreso': $('transcripcion').textContent = datos; break;
+    case 'sistema': ui.añadirMensaje('sistema', datos); break;
     case 'rutina_inicio': ui.añadirMensaje('sistema', `▶ ${datos.nombre}…`); break;
     case 'rutina':
       if (datos.ok) {

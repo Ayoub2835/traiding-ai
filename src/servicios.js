@@ -245,6 +245,15 @@ function iniciar(contexto) {
   confirmacion.eventos.on('nueva', (p) => { ctx.mostrar(); enviar('confirmacion', p); });
   confirmacion.eventos.on('resuelta', (p) => enviar('confirmacion_resuelta', p));
   programador.iniciar((id) => ejecutarRutina(id));
+  // Si Ollama no está abierto, se abre solo para que el modelo local funcione.
+  ollama.asegurarAbierto().then((r) => {
+    if (!r.abiertoPorJarvis) return;
+    // La ventana puede no haber cargado todavía: se avisa cuando esté lista.
+    const v = ctx.ventana();
+    const avisar = () => enviar('sistema', 'He abierto Ollama (modelo local).');
+    if (v && !v.webContents.isLoading()) setTimeout(avisar, 1500);
+    else if (v) v.webContents.once('did-finish-load', () => setTimeout(avisar, 1500));
+  });
 }
 
 module.exports = { iniciar, ejecutarRutina, ACCIONES };

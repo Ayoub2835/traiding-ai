@@ -46,11 +46,10 @@
 
     <!-- Centro: núcleo reactor -->
     <section class="centro">
-      <canvas id="nucleo" width="640" height="640" title="Pulsa para hablar"></canvas>
+      <canvas id="nucleo" width="640" height="640" title="Di «Jarvis» para hablar"></canvas>
       <div class="subtitulo" id="estadoVoz">INICIANDO…</div>
       <div class="transcripcion" id="transcripcion" dir="auto"></div>
       <div class="controles-voz">
-        <button class="btn-micro" id="btnMicro" title="Pulsa para hablar (o mantén Ctrl+Espacio)">🎙</button>
         <button class="btn-parar oculto" id="btnParar" title="Parar a Jarvis (Esc)">■</button>
       </div>
     </section>
@@ -125,9 +124,6 @@
         </label>
         <label class="ajuste">Modo conversación (vuelve a escuchar solo)
           <input type="checkbox" id="ajConversacion">
-        </label>
-        <label class="ajuste">Escuchar siempre la palabra «Jarvis» (sin conexión)
-          <input type="checkbox" id="ajActivacion">
         </label>
         <label class="ajuste">Interrumpirle hablando mientras habla
           <input type="checkbox" id="ajInterrumpir">

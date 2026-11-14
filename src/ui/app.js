@@ -61,7 +61,7 @@ function reposo() {
 function actualizarBotones() {
   const hablando = estado.hablando || reproductor.sonando || (boca && boca.hablando);
   $('btnParar').classList.toggle('oculto', !(hablando || estado.ocupado || estado.conversando));
-  $('btnMicro').classList.toggle('activo', estado.grabando);
+  // Sin botón de micro: la escucha se ve en el núcleo y en el texto de estado.
 }
 
 let temporizadorAviso = null;
@@ -328,8 +328,7 @@ async function grabarFrase() {
   }
 }
 
-$('btnMicro').addEventListener('click', conversar);
-$('nucleo').addEventListener('click', conversar);
+// Sin botones: se habla diciendo «Jarvis». Ctrl+Espacio queda como respaldo oculto.
 $('btnParar').addEventListener('click', pararTodo);
 
 // Ctrl+Espacio (atajo global). Pulsar = empezar a hablar.
@@ -373,7 +372,7 @@ function alOirActivacion() {
 }
 
 async function reanudarActivacion() {
-  if (!estado.ajustes || !estado.ajustes.activacion) return;
+  if (!estado.ajustes) return;
   if (estado.ocupado || estado.grabando || estado.conversando || reproductor.sonando) return;
   try {
     await activacion.reanudar();
@@ -383,7 +382,7 @@ async function reanudarActivacion() {
 }
 
 async function aplicarActivacion() {
-  const encendida = !!estado.ajustes.activacion;
+  const encendida = true; // siempre escuchando «Jarvis» desde que arranca
   $('estadoActivacion').classList.toggle('oculto', !encendida);
   if (!encendida) return activacion.apagar();
   $('estadoActivacion').textContent = '◌ cargando oído local…';
@@ -544,7 +543,6 @@ function pintarAjustes() {
   $('ajVolumen').value = a.volumen;
   $('ajVolumenValor').textContent = Math.round(a.volumen * 100) + '%';
   $('ajConversacion').checked = a.conversacion;
-  $('ajActivacion').checked = !!a.activacion;
   $('ajInterrumpir').checked = !!a.interrumpir;
   $('ajModoVoz').value = a.modoVoz || 'auto';
   $('ajMovil').checked = !!a.avisarMovilNovedades;
@@ -581,7 +579,6 @@ $('ajVolumen').addEventListener('input', (e) => { $('ajVolumenValor').textConten
 $('ajVolumen').addEventListener('change', (e) => guardar({ volumen: Number(e.target.value) }));
 $('ajNombreVoz').addEventListener('change', (e) => guardar({ nombreVoz: e.target.value }));
 $('ajConversacion').addEventListener('change', (e) => guardar({ conversacion: e.target.checked }));
-$('ajActivacion').addEventListener('change', (e) => guardar({ activacion: e.target.checked }));
 $('ajInterrumpir').addEventListener('change', (e) => guardar({ interrumpir: e.target.checked }));
 $('ajMovil').addEventListener('change', (e) => guardar({ avisarMovilNovedades: e.target.checked }));
 $('ajModoVoz').addEventListener('change', async (e) => { await guardar({ modoVoz: e.target.value }); await window.__actualizarModoVoz(); window.Pestanas?.pintarServicios(); });
@@ -686,6 +683,8 @@ async function iniciar() {
   speechSynthesis.addEventListener('voiceschanged', pintarVoces);
   ponerEstadoVoz('EN ESPERA', 'reposo');
   estado.modoVoz = await api.llamar('voz.modo');
+  // Escucha la palabra «Jarvis» desde el primer momento (en local, sin botones).
+  aplicarActivacion();
   window.Pestanas?.iniciar({ añadirMensaje, mostrarError, decir, pararTodo, estado, activacion, reanudarActivacion, abrirConexion });
 
   if (estado.info.errorConfig) mostrarError('Configuración: ' + estado.info.errorConfig);
@@ -710,7 +709,6 @@ async function iniciar() {
     panel = await api.leerPanel();
   }
   pintarPanel(panel);
-  aplicarActivacion();
   await saludar();
   reanudarActivacion();
 }
