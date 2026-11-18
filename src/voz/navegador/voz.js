@@ -522,5 +522,17 @@ function limpiarParaVoz(texto) {
     .trim();
 }
 
-window.VozJarvis = { Grabadora, Reproductor, Pitidos, Vosk, Activacion, Vigilante, escucharSiNo, Boca, limpiarParaVoz, PATRON_ACTIVACION, abrirMicrofono, rms };
+// Convierte una grabación (webm/ogg) en audio mono a 16 kHz para Whisper local.
+async function aPcm16k(blob) {
+  const ctx = new OfflineAudioContext(1, 16000, 16000);
+  const audio = await ctx.decodeAudioData(await blob.arrayBuffer());
+  const offline = new OfflineAudioContext(1, Math.max(1, Math.ceil(audio.duration * 16000)), 16000);
+  const f = offline.createBufferSource();
+  f.buffer = audio;
+  f.connect(offline.destination);
+  f.start();
+  return (await offline.startRendering()).getChannelData(0).slice();
+}
+
+window.VozJarvis = { aPcm16k, Grabadora, Reproductor, Pitidos, Vosk, Activacion, Vigilante, escucharSiNo, Boca, limpiarParaVoz, PATRON_ACTIVACION, abrirMicrofono, rms };
 })();

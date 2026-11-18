@@ -51,8 +51,9 @@ test('router: cada petición va a su sitio', () => {
     ['¿Cuál es la capital de Francia?', 'local'],
     ['Explica paso a paso por qué conviene exportar coches a Argelia y compara los pros y contras con venderlos en España', 'claude'],
     ['wach rak, kifach ndir bach nbi3 tomobil f dzayer?', 'claude'],
-    ['¿Tengo correos importantes hoy?', 'n8n'],
-    ['¿Qué ideas nuevas hay?', 'n8n'],
+    ['¿Tengo correos importantes hoy?', 'correo'],
+    ['Responde al cliente del Arkana con un borrador', 'correo'],
+    ['¿Qué ideas nuevas hay?', 'local'],
     ['Crea un archivo Excel con los precios de los coches', 'manos'],
     ['Abre la web de Shopify y añade un producto nuevo', 'manos'],
     ['tarea: limpia el escritorio', 'manos'],
@@ -63,7 +64,12 @@ test('router: cada petición va a su sitio', () => {
     ['Compra acciones de Tesla por 500 euros', 'denegar'],
     ['Pregunta con modelo local: dime un chiste', 'local'],
   ];
-  for (const [t, ruta] of casos) assert.strictEqual(decidir(t).ruta, ruta, `"${t}" → ${decidir(t).ruta} (${decidir(t).motivo})`);
+  for (const [t, ruta] of casos) assert.strictEqual(decidir(t, { hayGemini: false }).ruta, ruta, `"${t}" → ${decidir(t).ruta} (${decidir(t).motivo})`);
+});
+
+test('n8n solo cuenta si está activado', () => {
+  assert.strictEqual(decidir('¿Qué ideas nuevas hay?', { usarN8n: true }).ruta, 'n8n');
+  assert.strictEqual(decidir('¿Qué ideas nuevas hay?', { usarN8n: false }).ruta, 'local');
 });
 
 test('respuesta simple con Ollama y dice quién contestó', async () => {
@@ -98,10 +104,10 @@ test('si Ollama falla, contesta Claude (respaldo)', async () => {
   assert.ok(r.respaldo && /local/.test(r.respaldo[0]));
 });
 
-test('sin Ollama ni Claude, contesta n8n', async () => {
+test('sin Ollama ni Claude, contesta n8n (si está activado)', async () => {
   claves.guardar({ ANTHROPIC_API_KEY: '' });
   const r = await cerebro.responder('¿Cuál es la capital de Italia?');
-  assert.ok(r.ok);
+  assert.ok(r.ok, r.error);
   assert.strictEqual(r.motor, 'n8n · Jarvis');
   claves.guardar({ ANTHROPIC_API_KEY: 'sk-ant-prueba' });
 });

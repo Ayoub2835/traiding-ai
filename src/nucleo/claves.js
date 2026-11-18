@@ -11,16 +11,25 @@ const { pedir } = require('./http');
 
 // Catálogo de claves que entiende Jarvis.
 const CATALOGO = [
-  { clave: 'ANTHROPIC_API_KEY', grupo: 'Cerebro', etiqueta: 'Clave de Claude (Anthropic)', secreta: true, ayuda: 'console.anthropic.com → API Keys. Para preguntas difíciles, habilidades y resúmenes.' },
+  { clave: 'GEMINI_API_KEY', grupo: 'Cerebro', etiqueta: 'Clave de Gemini (gratis)', secreta: true, ayuda: 'aistudio.google.com → Get API key (plan gratuito, con límite diario). Para preguntas difíciles, informes y búsqueda de oportunidades.' },
+  { clave: 'GEMINI_MODELO', grupo: 'Cerebro', etiqueta: 'Modelo de Gemini', defecto: 'gemini-2.5-flash' },
+  { clave: 'GEMINI_LIMITE_DIARIO', grupo: 'Cerebro', etiqueta: 'Máximo de peticiones a Gemini al día', defecto: '200' },
+  { clave: 'ANTHROPIC_API_KEY', grupo: 'Cerebro', etiqueta: 'Clave de Claude (opcional, de pago)', secreta: true, ayuda: 'console.anthropic.com → API Keys. Opcional: si no la pones, Jarvis usa Gemini y Ollama.' },
   { clave: 'CLAUDE_MODELO', grupo: 'Cerebro', etiqueta: 'Modelo de Claude', defecto: 'claude-opus-5-5' },
   { clave: 'CLAUDE_ESFUERZO', grupo: 'Cerebro', etiqueta: 'Esfuerzo de Claude (low/medium/high)', defecto: 'medium' },
   { clave: 'OLLAMA_URL', grupo: 'Cerebro', etiqueta: 'Dirección de Ollama', defecto: 'http://127.0.0.1:11434' },
   { clave: 'OLLAMA_MODELO', grupo: 'Cerebro', etiqueta: 'Modelo local de Ollama', defecto: 'qwen2.5:3b' },
-  { clave: 'OPENAI_API_KEY', grupo: 'Voz', etiqueta: 'Clave de OpenAI', secreta: true, ayuda: 'platform.openai.com → API keys. Voz en tiempo real (Realtime), transcripción y voz de Jarvis.' },
+  { clave: 'WHISPER_MODELO', grupo: 'Voz', etiqueta: 'Modelo de Whisper local', defecto: 'onnx-community/whisper-small', ayuda: 'Se descarga una vez (~500 MB) y funciona sin internet. Más rápido y menos preciso: onnx-community/whisper-base' },
+  { clave: 'EDGE_VOZ_ES', grupo: 'Voz', etiqueta: 'Voz en español (Edge, gratis)', defecto: 'es-ES-AlvaroNeural', ayuda: 'Otras: es-ES-ElviraNeural (mujer), es-ES-XimenaNeural' },
+  { clave: 'EDGE_VOZ_AR', grupo: 'Voz', etiqueta: 'Voz en árabe (Edge)', defecto: 'ar-SA-HamedNeural' },
+  { clave: 'EDGE_VOZ_DARIJA', grupo: 'Voz', etiqueta: 'Voz para la dárija (Edge, árabe argelino)', defecto: 'ar-DZ-IsmaelNeural' },
+  { clave: 'EDGE_VOZ_FR', grupo: 'Voz', etiqueta: 'Voz en francés (Edge)', defecto: 'fr-FR-HenriNeural' },
+  { clave: 'OPENAI_API_KEY', grupo: 'Voz', etiqueta: 'Clave de OpenAI (opcional, de pago)', secreta: true, ayuda: 'platform.openai.com → API keys. Voz en tiempo real (Realtime), transcripción y voz de Jarvis.' },
   { clave: 'OPENAI_REALTIME_MODELO', grupo: 'Voz', etiqueta: 'Modelo OpenAI Realtime', defecto: 'gpt-realtime' },
   { clave: 'OPENAI_VOZ', grupo: 'Voz', etiqueta: 'Voz de OpenAI', defecto: 'onyx' },
-  { clave: 'GEMINI_API_KEY', grupo: 'Voz', etiqueta: 'Clave de Gemini (Google AI Studio)', secreta: true, ayuda: 'aistudio.google.com → Get API key. Alternativa a OpenAI para la voz en tiempo real.' },
   { clave: 'GEMINI_LIVE_MODELO', grupo: 'Voz', etiqueta: 'Modelo Gemini Live', defecto: 'gemini-2.5-flash-native-audio-preview-09-2025' },
+  { clave: 'GMAIL_USUARIO', grupo: 'Correo', etiqueta: 'Tu Gmail', ayuda: 'Tu dirección completa de Gmail.' },
+  { clave: 'GMAIL_CLAVE_APP', grupo: 'Correo', etiqueta: 'Contraseña de aplicación de Gmail', secreta: true, ayuda: 'myaccount.google.com/apppasswords (necesita la verificación en 2 pasos). Jarvis solo LEE y crea BORRADORES con tu permiso; nunca envía.' },
   { clave: 'NTFY_TEMA', grupo: 'Avisos', etiqueta: 'Tema de ntfy (tu canal privado)', secreta: true, ayuda: 'Instala la app ntfy en el móvil y suscríbete a un tema difícil de adivinar, p. ej. jarvis-ayoub-8f3k2.' },
   { clave: 'NTFY_SERVIDOR', grupo: 'Avisos', etiqueta: 'Servidor ntfy', defecto: 'https://ntfy.sh' },
   { clave: 'NTFY_TOKEN', grupo: 'Avisos', etiqueta: 'Token de ntfy (opcional)', secreta: true },
@@ -118,8 +127,14 @@ const PRUEBAS = {
     return r.ok ? 'OpenAI responde' : r.error;
   },
   async GEMINI_API_KEY() {
-    const r = await pedir(`https://generativelanguage.googleapis.com/v1beta/models?pageSize=1&key=${encodeURIComponent(obtener('GEMINI_API_KEY'))}`, {}, 20);
-    return r.ok ? 'Gemini responde' : r.error;
+    const gemini = require('../cerebro/gemini');
+    const r = await gemini.chat({ sistema: 'Responde solo: OK', mensajes: [{ role: 'user', content: 'Prueba' }], contar: false });
+    return r.ok ? `Gemini responde (${r.motor})` : r.error;
+  },
+  async GMAIL_CLAVE_APP() {
+    const correo = require('../correo');
+    const r = await correo.probar();
+    return r.ok ? `Gmail OK: ${r.noLeidos} sin leer` : r.error;
   },
   async OLLAMA_URL() {
     const r = await pedir(`${obtener('OLLAMA_URL')}/api/tags`, {}, 10);
@@ -148,6 +163,8 @@ const PRUEBAS = {
   },
 };
 PRUEBAS.OLLAMA_MODELO = PRUEBAS.OLLAMA_URL;
+PRUEBAS.GEMINI_MODELO = PRUEBAS.GEMINI_API_KEY;
+PRUEBAS.GMAIL_USUARIO = PRUEBAS.GMAIL_CLAVE_APP;
 PRUEBAS.TWILIO_TOKEN = PRUEBAS.TWILIO_SID;
 PRUEBAS.SHOPIFY_TIENDA = PRUEBAS.SHOPIFY_TOKEN;
 

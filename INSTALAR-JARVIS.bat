@@ -10,13 +10,13 @@ rem  6) Abre dist\Jarvis-Setup-*.exe para instalar
 rem ==========================================================================
 chcp 65001 >nul
 setlocal
-title Instalar Jarvis v2
+title Instalar Jarvis
 cd /d "%~dp0"
 set "MODELO_LOCAL=qwen2.5:3b"
 
 echo.
 echo  ============================================
-echo     J.A.R.V.I.S. v2  -  Instalacion
+echo     J.A.R.V.I.S.  -  Instalacion (100%% local y gratis)
 echo  ============================================
 echo.
 
@@ -73,7 +73,8 @@ if not errorlevel 1 (
   echo        Claude Code OK.
   goto :dependencias
 )
-echo        Claude Code no esta instalado. Sin el, Jarvis habla y piensa, pero no hace tareas en el PC.
+echo        Claude Code ^(opcional, necesita cuenta de Anthropic^) no esta instalado.
+echo        Sin el, Jarvis habla, piensa, lee tu correo y hace sus rutinas; solo no hace tareas en el PC.
 set "RESP=N"
 set /p "RESP=        Instalarlo ahora con npm install -g @anthropic-ai/claude-code? (S/N): "
 if /i not "%RESP%"=="S" (
@@ -111,8 +112,9 @@ echo        %INSTALADOR%
 start "" "%INSTALADOR%"
 echo.
 echo  Listo. Sigue los pasos del instalador.
-echo  Al abrir Jarvis: 1) pega las 3 direcciones de tu n8n en "Conectar Jarvis"
-echo                   2) pega tus claves en Ajustes, "Claves y servicios" y pulsa "Probar".
+echo  Al abrir Jarvis: pega tu clave GRATIS de Gemini ^(aistudio.google.com^) y, si quieres correo,
+echo  tu Gmail y una contrasena de aplicacion en Ajustes, "Claves y servicios", y pulsa "Probar".
+echo  La primera vez Jarvis descarga el oido local ^(Whisper, unos 500 MB^): espera a que diga que esta listo.
 echo.
 pause
 exit /b 0

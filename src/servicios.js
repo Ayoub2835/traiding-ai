@@ -24,6 +24,11 @@ const monitores = require('./rutinas/monitores');
 const programador = require('./rutinas/programador');
 const confirmacion = require('./seguridad/confirmacion');
 const registro = require('./seguridad/registro');
+const gemini = require('./cerebro/gemini');
+const correo = require('./correo');
+const negocio = require('./rutinas/negocio');
+const busqueda = require('./rutinas/busqueda');
+const path = require('path');
 
 let ctx = null;        // { cfg(), ventana(), mostrar(), panel(), icono }
 let cerebro = null;
@@ -35,11 +40,38 @@ const enviar = (tipo, datos) => {
   if (v && !v.isDestroyed()) v.webContents.send('jarvis:evento', { tipo, datos });
 };
 
-// n8n como herramienta del cerebro (chat de texto de tu Jarvis de siempre).
+const usarN8n = () => Boolean(ajustes.leer().usarN8n);
+const modoVoz = () => voz.modo(ajustes.leer().modoVoz, { usarN8n: usarN8n() });
+
+// n8n como herramienta del cerebro: OPCIONAL (apagado por defecto en Ajustes).
 async function n8nChat(texto) {
+  if (!usarN8n()) return { ok: false, error: 'n8n está desactivado (opcional en Ajustes)' };
   const cfg = ctx.cfg();
   if (!cfg || !cfg.n8n || !cfg.n8n.chatUrl) return { ok: false, error: 'n8n no está conectado' };
   return n8n.enviarMensaje(cfg, ajustes.leer().sessionId, String(texto).slice(0, 6000));
+}
+
+// Buscar en internet gratis (monitores, habilidades): Gemini con Google o Google News.
+async function buscarWeb(pedido) {
+  if (gemini.disponible()) {
+    const r = await gemini.chat({ sistema: `Busca en internet y devuelve solo los datos encontrados, con sus fuentes. ${require('./seguridad/inyeccion').REGLA_DATOS}`, mensajes: [{ role: 'user', content: pedido }], buscar: true });
+    if (r.ok) return { ok: true, respuesta: `${r.texto}\nFuentes: ${(r.fuentes || []).map((f) => f.url).join(' | ')}` };
+  }
+  const consulta = String(pedido).replace(/^Tarea de vigilancia "[^"]*":\s*/, '').split('\n')[0].slice(0, 120);
+  const n = await busqueda.googleNews(consulta, 8);
+  if (!n.length) return { ok: false, error: 'No se pudo buscar en internet' };
+  return { ok: true, respuesta: n.map((x) => `- ${x.titulo} (${x.medio}, ${x.fecha.slice(5, 16)}) ${x.url}`).join('\n') };
+}
+
+// Correo y agenda para el resumen de la mañana (Gmail local, o n8n si está activado).
+async function datosCorreo() {
+  if (correo.configurado()) {
+    try {
+      const c = await correo.leerNoLeidos({ dias: 1, max: 15 });
+      return { ok: true, respuesta: c.length ? c.map((m) => `De ${m.de}: ${m.asunto}`).join('\n') : 'Sin correos nuevos.' };
+    } catch (e) { return { ok: false, error: e.message }; }
+  }
+  return usarN8n() ? n8nChat('Dame solo datos: correos importantes sin leer de las últimas 24 h y mi agenda de hoy.') : { ok: false, error: 'Correo no configurado' };
 }
 
 // Ejecuta una tarea de manos y espera el resultado (para habilidades y monitores).
@@ -54,7 +86,7 @@ function herramientasHabilidad({ pensar }) {
   return {
     pensar: (t) => texto(pensar('Eres Jarvis, el asistente de Ayoub. Responde en el idioma de la petición, claro y sin markdown.', t)),
     pensar_claude: (t) => texto(pensar('Eres Jarvis, el asistente de Ayoub. Responde en el idioma de la petición.', t, { preferir: 'claude' })),
-    n8n: async (t) => { const r = await n8nChat(t); if (!r.ok) throw new Error(r.error); return r.respuesta; },
+    n8n: async (t) => { const r = usarN8n() ? await n8nChat(t) : await buscarWeb(t); if (!r.ok) throw new Error(r.error); return r.respuesta; },
     manos: async (t) => { const r = await manosYEsperar(t, 'habilidad'); if (!r.ok) throw new Error(r.error); return r.texto; },
     memoria_buscar: async (t) => memoria.buscar(t, 8).map((h) => `- ${h.texto}`).join('\n') || '(nada guardado sobre esto)',
     memoria_guardar: async (t) => { memoria.guardarHecho(t, 'dato', 'habilidad'); return 'Guardado en memoria'; },
@@ -89,10 +121,23 @@ async function ejecutarRutina(id, { desdeWindows = false } = {}) {
   const r = programador.obtener(id);
   if (!r) return { ok: false, error: 'Rutina no encontrada' };
   enviar('rutina_inicio', { id, nombre: r.nombre });
+  if (id === 'informe' || id === 'caza') {
+    const tareas = manos.listar().filter((t) => ['en_cola', 'en_curso', 'esperando_permiso', 'fallida'].includes(t.estado)).slice(0, 5);
+    const res = id === 'informe' ? await negocio.informe({ pensar: cerebro.pensar, tareas }) : await negocio.caza({ pensar: cerebro.pensar });
+    programador.anotarEjecucion(id, res);
+    if (res.ok && res.novedad) {
+      ctx.refrescarPanel();
+      if (Notification.isSupported()) new Notification({ title: id === 'informe' ? '📋 Informe diario' : '💡 Nueva idea de Jarvis', body: res.resumen, icon: ctx.icono }).show();
+      await avisos.avisar({ titulo: id === 'informe' ? 'Informe diario de Jarvis' : 'Nueva idea de Jarvis', mensaje: res.resumen });
+    }
+    enviar('rutina', { id, nombre: r.nombre, ...res, hablar: false });
+    enviar('rutinas', programador.todas());
+    return res;
+  }
   if (id === 'resumen') {
     const res = await resumen.generar({
       nombre: (ctx.cfg() && ctx.cfg().nombreUsuario) || 'Ayoub',
-      n8nChat,
+      n8nChat: datosCorreo,
       panel: ctx.panel,
       tareasPendientes: () => manos.listar().filter((t) => ['en_cola', 'en_curso', 'esperando_permiso', 'fallida'].includes(t.estado)).slice(0, 5),
       pensar: cerebro.pensar,
@@ -103,7 +148,7 @@ async function ejecutarRutina(id, { desdeWindows = false } = {}) {
     enviar('rutina', { id, nombre: r.nombre, ...res, hablar: true });
     return res;
   }
-  const res = await monitores.ejecutar(r, { n8nChat, manos: (t) => manosYEsperar(t, `monitor:${r.nombre}`), pensar: cerebro.pensar });
+  const res = await monitores.ejecutar(r, { n8nChat: (t) => (usarN8n() && r.motor === 'n8n' ? n8nChat(t) : buscarWeb(t)), manos: (t) => manosYEsperar(t, `monitor:${r.nombre}`), pensar: cerebro.pensar });
   programador.anotarEjecucion(id, res);
   if (res.ok && res.novedad) {
     if (Notification.isSupported()) new Notification({ title: `👁 ${r.nombre}`, body: res.resumen, icon: ctx.icono }).show();
@@ -140,11 +185,16 @@ async function programarWindows(id, activar) {
 // ---------------------------------------------------------------------------
 async function estadoServicios() {
   const [o, cc] = await Promise.all([ollama.disponible(), manos.comprobar()]);
+  const w = voz.estadoWhisper();
   return {
     ollama: { ok: o.ok, detalle: o.ok ? `Ollama · ${ollama.modelo()}` : o.error },
-    claude: { ok: claude.disponible(), detalle: claude.disponible() ? `Claude · ${claude.modelo()}` : 'Falta ANTHROPIC_API_KEY' },
+    gemini: { ok: gemini.disponible(), detalle: gemini.estado() },
+    whisper: { ok: w.listo, detalle: w.listo ? 'Whisper local listo' : w.error ? `Whisper: ${w.error}` : `Whisper descargándose (${w.progreso}%)` },
+    correo: { ok: correo.configurado(), detalle: correo.configurado() ? `Gmail: ${claves.obtener('GMAIL_USUARIO')}` : 'Gmail sin configurar' },
+    n8n: { ok: usarN8n(), detalle: usarN8n() ? 'n8n activado' : 'n8n desactivado (opcional)' },
+    claude: { ok: claude.disponible(), detalle: claude.disponible() ? `Claude · ${claude.modelo()}` : 'Sin clave (opcional, de pago)' },
     claudeCode: { ok: cc.ok, detalle: cc.ok ? `Claude Code ${cc.version}` : cc.error },
-    voz: { ok: true, detalle: { 'realtime-openai': 'Tiempo real · OpenAI', 'realtime-gemini': 'Tiempo real · Gemini Live', openai: 'OpenAI (grabar y transcribir)', n8n: 'Voz por n8n' }[voz.modo(ajustes.leer().modoVoz)], modo: voz.modo(ajustes.leer().modoVoz) },
+    voz: { ok: true, detalle: { local: 'Local y gratis: Whisper + Edge TTS', 'realtime-openai': 'Tiempo real · OpenAI', 'realtime-gemini': 'Tiempo real · Gemini Live', openai: 'OpenAI (grabar y transcribir)', n8n: 'Voz por n8n' }[modoVoz()], modo: modoVoz() },
     ntfy: { ok: claves.tiene('NTFY_TEMA'), detalle: claves.tiene('NTFY_TEMA') ? 'Avisos al móvil activos' : 'Sin avisos al móvil' },
     twilio: { ok: claves.tiene('TWILIO_SID'), detalle: claves.tiene('TWILIO_SID') ? 'Llamadas urgentes activas' : 'Sin llamadas' },
   };
@@ -167,9 +217,11 @@ const ACCIONES = {
   },
   'cerebro.decidir': (texto) => cerebro.decidir(String(texto || '')),
   // Voz
-  'voz.modo': () => voz.modo(ajustes.leer().modoVoz),
+  'voz.modo': () => modoVoz(),
+  // Whisper local: audio mono 16 kHz (Float32Array) → texto + idioma
+  'voz.transcribirLocal': (audio) => voz.transcribirLocal(audio instanceof Float32Array ? audio : new Float32Array(audio)),
   'voz.transcribir': (audio, mime) => voz.transcribir(Buffer.from(audio), mime),
-  'voz.sintetizar': (texto) => voz.sintetizar(texto),
+  'voz.sintetizar': (texto, lang) => voz.sintetizar(texto, { lang }),
   'voz.sesionOpenAI': () => voz.sesionOpenAI((ctx.cfg() && ctx.cfg().nombreUsuario) || 'Ayoub'),
   'voz.geminiAbrir': async () => {
     const s = new voz.SesionGemini((ctx.cfg() && ctx.cfg().nombreUsuario) || 'Ayoub');
@@ -204,6 +256,17 @@ const ACCIONES = {
   'rutinas.windows': (id, activar) => programarWindows(id, Boolean(activar)),
   // Memoria
   'memoria.hechos': () => memoria.leerHechos().slice().reverse(),
+  'memoria.estado': (id, estadoNuevo) => { const ok = memoria.cambiarEstado(id, String(estadoNuevo).slice(0, 30)); ctx.refrescarPanel(); return ok; },
+  'memoria.importar': async () => {
+    const { canceled, filePaths } = await dialog.showOpenDialog(ctx.ventana(), { title: 'Importar memoria de Jarvis (n8n)', filters: [{ name: 'JSON', extensions: ['json'] }], properties: ['openFile'] });
+    if (canceled || !filePaths[0]) return { ok: false, error: 'Cancelado' };
+    try {
+      const r = memoria.importarN8n(JSON.parse(require('fs').readFileSync(filePaths[0], 'utf8')));
+      registro.anotar({ origen: 'memoria', accion: `importar ${filePaths[0]}`, detalle: r });
+      ctx.refrescarPanel();
+      return { ok: true, ...r };
+    } catch (e) { return { ok: false, error: e.message }; }
+  },
   'memoria.borrarHecho': (id) => memoria.borrarHecho(id),
   // Claves y servicios
   'claves.listar': () => claves.paraInterfaz(),
@@ -219,6 +282,8 @@ function iniciar(contexto) {
   cerebro = crearCerebro({
     nombre: () => (ctx.cfg() && ctx.cfg().nombreUsuario) || 'Ayoub',
     n8nChat,
+    usarN8n,
+    correo: (texto, o) => correo.atender(texto, o),
     panel: ctx.panel,
     crearMonitor: crearMonitorDesdeTexto,
     herramientasHabilidad,
@@ -246,6 +311,18 @@ function iniciar(contexto) {
   confirmacion.eventos.on('resuelta', (p) => enviar('confirmacion_resuelta', p));
   programador.iniciar((id) => ejecutarRutina(id));
   // Si Ollama no está abierto, se abre solo para que el modelo local funcione.
+  // Memoria de n8n: se importa sola si importado-n8n.json está en la carpeta del
+  // proyecto, en Documentos\Jarvis o en Descargas (sin duplicar).
+  const imp = memoria.importarAutomatico([
+    path.join(rutas.RAIZ, 'memoria', 'importado-n8n.json'),
+    path.join(rutas.espacioTrabajo(), 'importado-n8n.json'),
+    path.join(app.getPath('downloads'), 'importado-n8n.json'),
+  ]);
+  if (imp && imp.importadas) registro.anotar({ origen: 'memoria', accion: `importada memoria de n8n (${imp.importadas} filas)`, detalle: imp.archivo });
+
+  // Whisper local: se carga (y la primera vez se descarga) en segundo plano.
+  voz.cargarWhisper((p) => enviar('whisper', p)).then(() => enviar('whisper', 100)).catch((e) => enviar('sistema', `Whisper no se pudo cargar: ${e.message}`));
+
   ollama.asegurarAbierto().then((r) => {
     if (!r.abiertoPorJarvis) return;
     // La ventana puede no haber cargado todavía: se avisa cuando esté lista.

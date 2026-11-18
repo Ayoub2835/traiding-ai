@@ -1,18 +1,28 @@
-# Jarvis v2 — asistente personal de escritorio para Windows
+# Jarvis — asistente personal de escritorio para Windows (100 % local y gratis)
 
-Jarvis es una app de escritorio (Electron) que **escucha, piensa, actúa y avisa**:
+Jarvis es una app de escritorio (Electron) que **escucha, piensa, actúa y avisa** sin depender de n8n ni de servicios de pago:
 
-- **Voz**: escucha siempre la palabra «Jarvis» desde que arranca, sin botones (Ctrl+Espacio queda como respaldo); conversación seguida y puedes interrumpirle hablando. En tiempo real con OpenAI Realtime o Gemini Live si tienes clave; si no, con tu flujo de voz de n8n.
-- **Cerebro**: un router elige quién contesta y te lo muestra en pantalla («vía Ollama · qwen2.5:3b», «vía Claude», «vía n8n»…).
-- **Manos**: hace tareas reales en tu PC con Claude Code (archivos, navegador, Shopify, n8n), con un panel de **Tareas** con estado y botón de cancelar.
-- **Habilidades**: «Jarvis, aprende a…» crea una habilidad reutilizable.
-- **Rutinas**: resumen de la mañana hablado y monitores programados con memoria.
-- **Memoria** local + la memoria de tu n8n.
-- **Avisos** al móvil (ntfy) y llamada para lo urgente (Twilio).
-- **Seguridad**: pide tu «sí» por voz antes de pagar, comprar, borrar, publicar, enviar a otros, instalar o tocar ajustes de Windows. Con el dinero solo vigila y avisa.
-- Idiomas: **español, dárija argelina, árabe y francés** (el árabe se muestra de derecha a izquierda).
+| Parte | Cómo funciona (gratis) |
+|---|---|
+| **Oído** | Whisper ejecutado **en tu PC** (transformers.js/ONNX). Entiende español, dárija, árabe y francés. Se descarga una vez (~500 MB) y luego va sin internet. |
+| **Palabra «Jarvis»** | Escucha siempre desde que arranca, sin botones (Vosk, en local). Ctrl+Espacio queda como respaldo. |
+| **Cerebro** | Lo sencillo, **Ollama** (`qwen2.5:3b`, en tu PC; si está cerrado, Jarvis lo abre solo). Lo difícil, el árabe y la dárija, **Gemini** con tu clave gratuita. Si Gemini da error 429 (límite gratis) o llegas al límite diario que pongas, pasa a Ollama sin romperse. Siempre muestra quién contestó. |
+| **Voz** | **Edge TTS** (gratis): voz de España (`es-ES-AlvaroNeural`), árabe, **árabe argelino para la dárija** (`ar-DZ-IsmaelNeural`) y francés. La voz de Windows solo como respaldo. |
+| **Memoria** | Local. La memoria que tenías en n8n se importa y aparece en **PENDIENTE** (botón «✓ Visto» para marcarla). |
+| **Rutinas** | **Informe diario a las 12:00** y **caza de oportunidades a las 9, 13, 17 y 21 h**, con el estilo de antes: puntuación (beneficio € × probabilidad) ÷ horas, solo con fuentes reales y como mucho 1 idea al día. Búsqueda gratis: Google dentro de Gemini o, si no, Google News. |
+| **Correo** | Gmail por IMAP con una contraseña de aplicación: lee y crea **borradores** solo si dices «sí». **Nunca envía.** |
+| **n8n** | Opcional, apagado por defecto (Ajustes → «Usar n8n»). |
 
+Además: manos con Claude Code (opcional, de pago), habilidades, monitores, avisos al móvil (ntfy) y seguridad con confirmación por voz.
 Basado en parte en ideas y código adaptado de [OpenJarvis](https://github.com/open-jarvis/OpenJarvis) (Apache 2.0). Ver [`NOTICE`](NOTICE) y [`docs/PLAN.md`](docs/PLAN.md).
+
+## Actualizar la app en tu PC
+
+1. Descarga la última versión de la rama `claude/lucid-hawking-kithaj` (botón *Code → Download ZIP* en GitHub, o `git pull` si usas Git) y descomprímela encima de la carpeta anterior.
+2. Copia tu `importado-n8n.json` en la carpeta `memoria` del proyecto, en `Documentos\Jarvis` o en `Descargas` (Jarvis lo importa solo, sin duplicar). También puedes usar *Ajustes → Importar memoria*.
+3. Haz doble clic en **`INSTALAR-JARVIS.bat`** e instala encima de la versión anterior (tus ajustes, claves y memoria se conservan).
+4. En Jarvis: *Ajustes → Claves y servicios* → pega tu clave de **Gemini** (gratis) y, si quieres, tu **Gmail** + contraseña de aplicación → *Probar*.
+5. *Rutinas* → en «Informe diario» y «Caza de oportunidades» pulsa **Programar en Windows** (pregunta antes de crear las tareas).
 
 ## Instalación fácil (Windows)
 
@@ -25,9 +35,9 @@ Basado en parte en ideas y código adaptado de [OpenJarvis](https://github.com/o
    4. `npm install`;
    5. `npm run compilar` (descarga el modelo de voz y crea el instalador);
    6. abre `dist\Jarvis-Setup-*.exe` para instalar (acceso directo en el escritorio).
-4. Abre Jarvis:
-   - **Conectar Jarvis**: pega las 3 URLs de tu n8n (chat, panel y voz) → *Probar y guardar*.
-   - **Ajustes → Claves y servicios**: pega tus claves y pulsa *Probar* en cada una.
+4. Abre Jarvis y en **Ajustes → Claves y servicios** pega tu clave de Gemini (gratis) y, si quieres correo, tu Gmail y la contraseña de aplicación; pulsa *Probar*.
+   La primera vez descarga el oído local (Whisper, ~500 MB): el estado aparece bajo el núcleo.
+   n8n ya no hace falta; si algún día lo quieres, actívalo en *Ajustes → Usar n8n*.
 
 Si algo falla, la ventana dice «Algo ha fallado, haz una foto» y no se cierra.
 
@@ -38,15 +48,16 @@ Nunca van al repositorio (es público): `.env` y `config.json` están en `.gitig
 
 | Clave | Para qué | Dónde se consigue |
 |---|---|---|
-| `ANTHROPIC_API_KEY` | Claude: preguntas difíciles, árabe/dárija, habilidades, resúmenes. Claude Code puede usarla también. | console.anthropic.com → API Keys |
-| `OPENAI_API_KEY` | Voz en tiempo real (Realtime), transcripción multilingüe y voz de Jarvis | platform.openai.com → API keys |
-| `GEMINI_API_KEY` | Alternativa a OpenAI para la voz en tiempo real (Gemini Live) | aistudio.google.com → Get API key |
+| `GEMINI_API_KEY` | **Gratis.** Lo difícil, árabe/dárija, informe diario y caza de oportunidades (con búsqueda de Google). `GEMINI_LIMITE_DIARIO` (200 por defecto) pone tu propio tope diario. | aistudio.google.com → Get API key |
+| `GMAIL_USUARIO`, `GMAIL_CLAVE_APP` | **Gratis.** Leer tu correo y crear borradores (nunca envía) | myaccount.google.com/apppasswords (necesita la verificación en 2 pasos) |
+| `ANTHROPIC_API_KEY` | Opcional, de pago: Claude como alternativa a Gemini; Claude Code puede usarla. | console.anthropic.com → API Keys |
+| `OPENAI_API_KEY` | Opcional, de pago: voz en tiempo real (modo «Tiempo real») | platform.openai.com → API keys |
 | `NTFY_TEMA` | Avisos al móvil (gratis): instala la app **ntfy** y suscríbete a un tema difícil de adivinar | ntfy.sh |
 | `TWILIO_SID`, `TWILIO_TOKEN`, `TWILIO_DESDE`, `TWILIO_A` | Llamada de voz para avisos urgentes | console.twilio.com |
 | `SHOPIFY_TIENDA`, `SHOPIFY_TOKEN` | Que las manos trabajen con tu tienda | Shopify → Apps → Desarrollar apps → Admin API |
 | `N8N_MCP_URL`, `N8N_MCP_TOKEN` | Que las manos lean/editen tus flujos de n8n | n8n → Settings → MCP access |
 
-Sin ninguna clave Jarvis funciona como antes (n8n) más el modelo local de Ollama.
+Sin ninguna clave Jarvis funciona igual en local: Ollama, Whisper, Edge TTS y búsqueda por Google News.
 
 ## Cómo decide quién contesta (cerebro)
 
@@ -57,12 +68,13 @@ Sin ninguna clave Jarvis funciona como antes (n8n) más el modelo local de Ollam
 | La frase de una habilidad («redacta un email…») | Esa habilidad |
 | «Vigila… y avísame» | Rutinas (crea un monitor) |
 | Una acción real («crea un Excel…», «abre Shopify y…», «tarea: …») | Manos (Claude Code) |
-| Correos, ideas, informes, oportunidades | Tu Jarvis de n8n |
-| Algo difícil (razonar, comparar, código, cálculo) o en árabe/dárija | Claude |
+| Correos («¿tengo correos?», «responde a…») | Correo (Gmail; borradores con permiso) |
+| Ideas, informes, oportunidades | El cerebro, con tu memoria local (o n8n si lo activas) |
+| Algo difícil (razonar, comparar, código, cálculo) o en árabe/dárija | Gemini (gratis) → si da 429, Ollama |
 | Algo sencillo | Ollama (local, gratis; si no está abierto, Jarvis lo abre solo con `ollama serve`) |
 | Comprar/vender/transferir dinero | Nadie: lo rechaza (solo vigila y avisa) |
 
-Si el elegido falla, prueba el siguiente (local → Claude → n8n).
+Si el elegido falla, prueba el siguiente (Gemini → Ollama → Claude → n8n si está activado).
 
 ## Seguridad
 
@@ -76,9 +88,11 @@ Si el elegido falla, prueba el siguiente (local → Claude → n8n).
 
 ## Rutinas
 
-- **Resumen de la mañana** (08:30 por defecto): correos y agenda (vía n8n), ideas e informes pendientes, tareas sin terminar y noticias; te lo dice en voz alta.
+- **Informe diario** (12:00): correo de Gmail + memoria + tareas → lo importante, top 3 acciones por (beneficio € × probabilidad) ÷ horas y qué dejar de hacer. Se guarda en PENDIENTE y te avisa.
+- **Caza de oportunidades** (9, 13, 17 y 21 h): busca en internet (Google dentro de Gemini, o Google News si no hay Gemini) y propone como mucho **1 idea al día**, solo con fuentes reales y sin repetir ideas anteriores.
+- **Resumen de la mañana** (08:30): correos, pendientes, tareas y noticias, en voz alta.
 - **Monitores**: «vigila X y avísame» o *Rutinas → Nuevo monitor*. Recuerdan lo de la vez anterior y solo avisan si hay novedad.
-- Mientras Jarvis está abierto, se ejecutan solos. Para que funcionen con Jarvis cerrado, pulsa **Programar en Windows** (crea una tarea en el Programador de tareas; siempre pregunta antes).
+- Mientras Jarvis está abierto, se ejecutan solos. Para que funcionen con Jarvis cerrado, pulsa **Programar en Windows** (crea una tarea por cada hora en el Programador de tareas, carpeta `Jarvis`; siempre pregunta antes).
 
 ## Desarrollo
 
@@ -113,14 +127,15 @@ src/
   main.js          Ventana, bandeja, atajo Ctrl+Espacio, arranque con Windows, conexión n8n
   servicios.js     Une todos los módulos y los expone a la interfaz
   nucleo/          Configuración, ajustes, claves (.env), HTTP, red permitida, n8n
-  voz/             Voz de OpenAI, transcripción, tiempo real (OpenAI Realtime / Gemini Live)
+  voz/             Whisper local, Edge TTS, tiempo real opcional (OpenAI Realtime / Gemini Live)
     navegador/     Micro, Vosk (palabra «Jarvis», respaldo), reproductor, tiempo real en la ventana
-  cerebro/         Router, complejidad (de OpenJarvis), idioma, Ollama, Claude
+  cerebro/         Router, complejidad (de OpenJarvis), idioma, Ollama, Gemini, Claude
   manos/           Tareas con Claude Code + servidor MCP de permisos
   habilidades/     Skills TOML (incluidas/ adaptadas de OpenJarvis) y "aprende a…"
-  rutinas/         Resumen de la mañana, monitores, programador, noticias RSS
+  rutinas/         Informe diario, caza de oportunidades, resumen, monitores, programador, búsqueda gratis
   memoria/         Conversación y hechos en local
   avisos/          ntfy y Twilio
+  correo/          Gmail por IMAP: leer y borradores (nunca envía)
   seguridad/       Política, confirmaciones, detector de inyección, registro
   ui/              Interfaz (núcleo LED, chat, pestañas)
 test/              Pruebas automáticas y simuladores
@@ -137,6 +152,8 @@ docs/PLAN.md       Qué se tomó de OpenJarvis y por qué
 ## Limitaciones conocidas
 
 - La palabra «Jarvis» se detecta con el modelo pequeño de Vosk en español: puede tener alguna falsa alarma con palabras parecidas.
-- El respaldo sin conexión solo entiende español.
+- El respaldo sin Whisper (Vosk) solo entiende español.
+- Edge TTS es un servicio gratuito de Microsoft sin garantías: si deja de funcionar, Jarvis habla con la voz de Windows.
+- La memoria importada de n8n no se sube a GitHub (el repositorio es público): `memoria/` está en `.gitignore`.
 - Claude Code y Ollama son programas aparte: el filtro de red de la ventana no los controla; los controla la política de permisos.
-- OpenAI Realtime, Gemini Live y Twilio están programados según su documentación, pero solo se han probado con servidores simulados: pruébalos con tus claves.
+- Gemini, Gmail, OpenAI Realtime y Twilio se han probado con servidores simulados (Gmail con un servidor IMAP de prueba): pruébalos con tus claves.

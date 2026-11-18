@@ -207,7 +207,7 @@ $('clCerrar').addEventListener('click', () => $('capaClaves').classList.add('ocu
 
 async function pintarServicios() {
   const s = await api.llamar('servicios.estado');
-  const nombres = { ollama: 'Modelo local', claude: 'Claude', claudeCode: 'Manos (Claude Code)', voz: 'Voz', ntfy: 'Móvil (ntfy)', twilio: 'Llamadas' };
+  const nombres = { ollama: 'Modelo local', gemini: 'Gemini (gratis)', whisper: 'Oído (Whisper)', correo: 'Correo', n8n: 'n8n', claude: 'Claude', claudeCode: 'Manos (Claude Code)', voz: 'Voz', ntfy: 'Móvil (ntfy)', twilio: 'Llamadas' };
   $('servicios').replaceChildren(...Object.entries(s).map(([k, v]) => {
     const d = el('div', `servicio ${v.ok ? 'ok' : 'mal'}`);
     d.append(el('span', 'punto'), el('strong', '', nombres[k] || k), el('span', 'meta', ` ${v.detalle}`));
@@ -236,7 +236,7 @@ $('rgCerrar').addEventListener('click', () => $('capaRegistro').classList.add('o
 // ---------------------------------------------------------------------------
 // Confirmación de seguridad (voz + botones)
 // ---------------------------------------------------------------------------
-const CATEGORIAS = { pagar: 'PAGAR', comprar: 'COMPRAR', borrar: 'BORRAR / MOVER A LA PAPELERA', publicar: 'PUBLICAR', enviar: 'ENVIAR A OTROS', instalar: 'INSTALAR UN PROGRAMA', ajustes: 'CAMBIAR AJUSTES DE WINDOWS', fuera: 'TOCAR ARCHIVOS FUERA DE SU CARPETA', desconocida: 'HERRAMIENTA DESCONOCIDA' };
+const CATEGORIAS = { borrador: 'GUARDAR UN BORRADOR DE CORREO (NO SE ENVÍA)', pagar: 'PAGAR', comprar: 'COMPRAR', borrar: 'BORRAR / MOVER A LA PAPELERA', publicar: 'PUBLICAR', enviar: 'ENVIAR A OTROS', instalar: 'INSTALAR UN PROGRAMA', ajustes: 'CAMBIAR AJUSTES DE WINDOWS', fuera: 'TOCAR ARCHIVOS FUERA DE SU CARPETA', desconocida: 'HERRAMIENTA DESCONOCIDA' };
 const colaConfirmar = [];
 let confirmando = null;
 
@@ -299,6 +299,10 @@ function alEvento({ tipo, datos }) {
     case 'habilidades': pintarHabilidades(); break;
     case 'progreso': $('transcripcion').textContent = datos; break;
     case 'sistema': ui.añadirMensaje('sistema', datos); break;
+    case 'whisper':
+      $('transcripcion').textContent = datos >= 100 ? '' : `Preparando el oído local (Whisper): ${datos}%`;
+      if (datos >= 100) pintarServicios();
+      break;
     case 'rutina_inicio': ui.añadirMensaje('sistema', `▶ ${datos.nombre}…`); break;
     case 'rutina':
       if (datos.ok) {
@@ -328,6 +332,7 @@ window.Pestanas = {
     // La memoria local se refresca al abrir su pestaña.
     document.querySelector('[data-pestana="memoria"]').addEventListener('click', pintarHechos);
     document.querySelector('[data-pestana="habilidades"]').addEventListener('click', pintarHabilidades);
+    document.querySelector('[data-pestana="ajustes"]').addEventListener('click', pintarServicios);
   },
   avisoTarea() { pintarTareas(); },
   pintarServicios,

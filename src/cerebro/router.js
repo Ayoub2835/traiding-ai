@@ -5,13 +5,15 @@
 //   frase de una habilidad     → habilidades (la ejecuta)
 //   "vigila … y avísame"       → rutinas (crea un monitor)
 //   acción real en el PC/web   → manos (Claude Code), con permisos
-//   correos, ideas, informes   → n8n (tu Jarvis de siempre, con Gmail y memoria)
-//   pregunta difícil / árabe   → Claude
+//   correos (leer / borrador) → correo (Gmail por IMAP; borradores con permiso)
+//   pregunta difícil / árabe   → Gemini (gratis); si da 429 o no hay clave → Ollama
 //   pregunta simple            → Ollama (modelo local)
+//   n8n: solo si lo activas en Ajustes (opcional)
 // Si el motor elegido falla, se prueba el siguiente.
 // La puntuación de complejidad está adaptada de OpenJarvis (ver complejidad.js).
 'use strict';
 const claude = require('./claude');
+const gemini = require('./gemini');
 const ollama = require('./ollama');
 const idioma = require('./idioma');
 const { puntuar } = require('./complejidad');
@@ -27,7 +29,8 @@ const UMBRAL_CLAUDE = 0.45;
 // --- Detección de intenciones ---------------------------------------------------
 const VERBO_ACCION = /\b(crea|crear|créame|creame|haz(?:me)?\s+(?:un|una)|genera(?:me)?\s+(?:un|una)\s+(?:archivo|excel|pdf|documento)|abre|abrir|abreme|ábreme|organiza|ordena|mueve|mover|renombra|descarga|descargar|guarda(?:me)?\s+en|edita|modifica|entra\s+en|navega|rellena|sube\s+(?:el|la|un|una)|instala|publica|cambia\s+el\s+precio|añade\s+(?:un\s+)?producto|crée|ouvre|range|déplace|télécharge|installe|افتح|أنشئ|نظم|حمل)\b/i;
 const OBJETO_ACCION = /\b(archivo|archivos|carpeta|carpetas|documento|excel|hoja|pdf|word|escritorio|descargas|documentos|web|página|pagina|navegador|chrome|google|shopify|tienda|producto|productos|pedido|n8n|flujo|workflow|script|código|codigo|programa|app|fichier|dossier|site|navigateur|ملف|مجلد|موقع)\b/i;
-const N8N = /\b(correo|correos|email|emails|e-mail|gmail|bandeja|informe|informes|idea|ideas|oportunidad|oportunidades|panel|pendientes?\s+de\s+n8n|mail|mails|courriel|بريد|إيميل)\b/i;
+const N8N = /\b(informe|informes|idea|ideas|oportunidad|oportunidades|panel|pendientes?\s+de\s+n8n)\b/i;
+const CORREO = /\b(correo|correos|email|emails|e-mail|gmail|bandeja|mail|mails|courriel|borrador|بريد|إيميل)\b/i;
 const MONITOR = /^(?:jarvis[,\s]+)?(?:vigila|vigílame|monitoriza|controla\s+cada|avísame\s+(?:si|cuando)|avisame\s+(?:si|cuando)|surveille|préviens-moi|راقب|نبهني)\b/i;
 const FORZAR_CLAUDE = /\b(usa claude|con claude|pregúntale a claude|piensa bien|a fondo)\b/i;
 const FORZAR_LOCAL = /\b(modelo local|con ollama|sin internet)\b/i;
@@ -35,7 +38,9 @@ const FORZAR_LOCAL = /\b(modelo local|con ollama|sin internet)\b/i;
 /**
  * @returns {{ruta:string, motivo:string, puntuacion:number, idioma:string, extra?:any}}
  */
-function decidir(texto, { hayClaude = claude.disponible() } = {}) {
+function decidir(texto, { hayGemini = gemini.disponible(), hayClaude = claude.disponible(), usarN8n = false } = {}) {
+  const hayGrande = hayGemini || hayClaude;
+  const grande = hayGemini ? 'gemini' : hayClaude ? 'claude' : 'local';
   const t = String(texto || '').trim();
   const lang = idioma.detectar(t);
   const { puntuacion, senales } = puntuar(t);
@@ -52,16 +57,17 @@ function decidir(texto, { hayClaude = claude.disponible() } = {}) {
   if (/^(?:tarea|hazlo tú|hazlo tu|manos)\s*[:,]/i.test(t) || (VERBO_ACCION.test(t) && OBJETO_ACCION.test(t))) {
     return { ...base, ruta: 'manos', motivo: 'Es una acción real en el PC o en la web' };
   }
-  if (N8N.test(t)) return { ...base, ruta: 'n8n', motivo: 'Correos, ideas o informes: lo sabe tu Jarvis de n8n' };
+  if (CORREO.test(t)) return { ...base, ruta: 'correo', motivo: 'Es sobre tu correo' };
+  if (usarN8n && N8N.test(t)) return { ...base, ruta: 'n8n', motivo: 'Ideas o informes: lo sabe tu Jarvis de n8n' };
   if (FORZAR_LOCAL.test(t)) return { ...base, ruta: 'local', motivo: 'Pides el modelo local' };
   if (FORZAR_CLAUDE.test(t)) return { ...base, ruta: 'claude', motivo: 'Pides Claude' };
-  if (hayClaude && (lang === 'ar' || lang === 'darija')) {
-    return { ...base, ruta: 'claude', motivo: `En ${idioma.NOMBRES[lang]} contesta mejor Claude` };
+  if (hayGrande && (lang === 'ar' || lang === 'darija')) {
+    return { ...base, ruta: grande, motivo: `En ${idioma.NOMBRES[lang]} contesta mejor ${grande === 'gemini' ? 'Gemini' : 'Claude'}` };
   }
   // Como en el router de OpenJarvis: complejidad alta O varias señales de razonamiento,
   // o código/matemáticas → modelo grande.
   if (puntuacion >= UMBRAL_CLAUDE || senales.razonamiento >= 0.8 || senales.dominio >= 0.7) {
-    return { ...base, ruta: 'claude', motivo: `Pregunta compleja (${puntuacion})` };
+    return { ...base, ruta: grande, motivo: `Pregunta compleja (${puntuacion})` };
   }
   return { ...base, ruta: 'local', motivo: `Pregunta sencilla (${puntuacion})` };
 }
@@ -69,7 +75,9 @@ function decidir(texto, { hayClaude = claude.disponible() } = {}) {
 // --- Prompts -------------------------------------------------------------------
 function sistema(nombre) {
   return [
-    `Eres Jarvis, el asistente personal de ${nombre} (empresario en España con negocios entre España y Argelia).`,
+    `Eres Jarvis, socio y asistente personal de ${nombre}. Tu objetivo es su beneficio neto: directo, cercano, sin humo.`,
+    'Negocios: Sardi Auto (coches en España y exportación a Argelia), Sahla (servicios para inmigrantes en Murcia), Éclara (Shopify, pausada). Habla árabe, francés y español; poco capital: prioriza ideas de 0-200 €.',
+    'Para decidir: (beneficio € × probabilidad) ÷ horas de Ayoub. Termina con el siguiente paso concreto cuando proceda.',
     'Respondes como en una conversación hablada: claro, directo, cálido y breve (2-5 frases salvo que pida detalle). Sin markdown.',
     'Contesta siempre en el idioma en que te hablan: español, dárija argelina, árabe o francés.',
     'No inventes datos. Si no lo sabes, dilo.',
@@ -91,11 +99,21 @@ function mensajeUsuario(texto, lang, deps) {
 }
 
 // --- Motores con respaldo ------------------------------------------------------------
-const ORDEN = { local: ['local', 'claude', 'n8n'], claude: ['claude', 'n8n', 'local'], n8n: ['n8n', 'claude', 'local'] };
+// Si Gemini da 429 (límite gratis), se pasa a Ollama sin romperse.
+const ORDEN = {
+  local: ['local', 'gemini', 'claude', 'n8n'],
+  gemini: ['gemini', 'local', 'claude', 'n8n'],
+  claude: ['claude', 'gemini', 'local', 'n8n'],
+  n8n: ['n8n', 'gemini', 'local', 'claude'],
+};
 
 async function usarMotor(motor, texto, lang, deps) {
   if (motor === 'local') {
     return ollama.chat({ sistema: sistema(deps.nombre()), mensajes: [{ role: 'user', content: mensajeUsuario(texto, lang, deps) }] });
+  }
+  if (motor === 'gemini') {
+    if (!gemini.disponible()) return { ok: false, error: gemini.estado() };
+    return gemini.chat({ sistema: sistema(deps.nombre()), mensajes: [{ role: 'user', content: mensajeUsuario(texto, lang, deps) }] });
   }
   if (motor === 'claude') {
     if (!claude.disponible()) return { ok: false, error: 'Sin clave de Claude' };
@@ -117,17 +135,19 @@ async function conRespaldo(ruta, texto, lang, deps) {
 
 /** Pensar sin conversación (habilidades, resúmenes, extractor). */
 function crearPensar(deps) {
-  return async (sistemaTxt, usuario, { preferir = 'claude' } = {}) => {
-    const orden = preferir === 'local' ? ['local', 'claude'] : ['claude', 'local'];
+  return async (sistemaTxt, usuario, { preferir = 'grande', buscar = false } = {}) => {
+    const orden = preferir === 'local' ? ['local', 'gemini', 'claude'] : preferir === 'claude' ? ['claude', 'gemini', 'local'] : ['gemini', 'claude', 'local'];
     const fallos = [];
+    const msgs = [{ role: 'user', content: usuario }];
     for (const m of orden) {
-      const r = m === 'claude'
-        ? (claude.disponible() ? await claude.chat({ sistema: sistemaTxt, mensajes: [{ role: 'user', content: usuario }] }) : { ok: false, error: 'sin clave' })
-        : await ollama.chat({ sistema: sistemaTxt, mensajes: [{ role: 'user', content: usuario }], temperatura: 0.2, segundos: 180 });
+      let r;
+      if (m === 'gemini') r = gemini.disponible() ? await gemini.chat({ sistema: sistemaTxt, mensajes: msgs, buscar }) : { ok: false, error: gemini.estado() };
+      else if (m === 'claude') r = claude.disponible() ? await claude.chat({ sistema: sistemaTxt, mensajes: msgs }) : { ok: false, error: 'sin clave' };
+      else r = await ollama.chat({ sistema: sistemaTxt, mensajes: msgs, temperatura: 0.2, segundos: 240 });
       if (r.ok) return r;
       fallos.push(`${m}: ${r.error}`);
     }
-    // Último recurso: el Jarvis de n8n.
+    // Último recurso (solo si n8n está activado): el Jarvis de n8n.
     const n = await deps.n8nChat(`${sistemaTxt}\n\n${usuario}`);
     return n.ok ? { ok: true, texto: n.respuesta, motor: 'n8n · Jarvis' } : { ok: false, error: fallos.join(' · ') };
   };
@@ -153,7 +173,7 @@ function crearCerebro(deps) {
    * @param {{origen?:string, alProgreso?:(t:string)=>void}} o
    */
   async function responder(texto, o = {}) {
-    const d = decidir(texto);
+    const d = decidir(texto, { usarN8n: Boolean(deps.usarN8n && deps.usarN8n()) });
     memoria.guardarMensaje('yo', texto, { origen: o.origen || 'texto' });
     registro.anotar({ origen: `cerebro:${o.origen || 'texto'}`, accion: `ruta ${d.ruta}`, motivo: d.motivo, detalle: texto.slice(0, 200) });
     let r;
@@ -185,6 +205,12 @@ function crearCerebro(deps) {
         case 'denegar':
           r = { ok: true, texto: 'Eso no lo hago: con el dinero solo vigilo y aviso, nunca compro, vendo ni hago transferencias. Si quieres, te creo una vigilancia y te aviso de los cambios.', motor: 'Seguridad' };
           break;
+        case 'correo': {
+          o.alProgreso?.('Mirando tu correo…');
+          r = await deps.correo(texto, { pensar, idioma: d.idioma });
+          if (r.ok && !r.motor) r.motor = 'Correo (Gmail)';
+          break;
+        }
         case 'manos': {
           const { tarea } = await manos.crear(texto.replace(/^(?:tarea|hazlo tú|hazlo tu|manos)\s*[:,]\s*/i, ''), { origen: o.origen || 'texto' });
           r = { ok: true, texto: frase('tarea', d.idioma), motor: 'Manos · Claude Code', tareaId: tarea.id };

@@ -130,10 +130,14 @@
         </label>
         <label class="ajuste">Modo de voz
           <select id="ajModoVoz">
-            <option value="auto">Tiempo real si hay clave (recomendado)</option>
+            <option value="local">Local y gratis: Whisper + Edge (recomendado)</option>
+            <option value="auto">Tiempo real si hay clave (de pago)</option>
             <option value="clasico">Grabar y transcribir (OpenAI)</option>
-            <option value="n8n">Solo n8n (como antes)</option>
+            <option value="n8n">Solo n8n (si está activado)</option>
           </select>
+        </label>
+        <label class="ajuste">Usar n8n (opcional; apagado = todo en tu PC)
+          <input type="checkbox" id="ajN8n">
         </label>
         <label class="ajuste">Ideas e informes nuevos también al móvil
           <input type="checkbox" id="ajMovil">
@@ -148,6 +152,7 @@
           <button id="btnProbarVoz">Probar voz</button>
           <button id="btnProbarNotif">Probar notificación</button>
           <button id="btnConexion">Cambiar conexión con n8n</button>
+          <button id="btnImportar">Importar memoria (JSON de n8n)</button>
           <button id="btnClaves">Claves y servicios</button>
           <button id="btnRegistro">Registro de acciones</button>
         </div>
