@@ -130,4 +130,87 @@ function detectarRecuerda(texto) {
   return m ? (m[1] || m[2] || m[3]).trim() : null;
 }
 
-module.exports = { guardarMensaje, ultimosMensajes, guardarHecho, borrarHecho, leerHechos, buscar, contexto, extraerHechos, detectarRecuerda, normalizar };
+// --- Entradas (lo que antes guardaba n8n en la tabla jarvis_memoria) ---------------
+// Ideas, informes, decisiones… con estado (pendiente_de_ver, en_curso, visto…).
+// Se muestran en el panel PENDIENTE / MEMORIA y las crean las rutinas.
+const archivoEntradas = () => archivo('entradas.json');
+function leerEntradas() {
+  try { return JSON.parse(fs.readFileSync(archivoEntradas(), 'utf8')); } catch (_) { return []; }
+}
+function escribirEntradas(e) { asegurarCarpeta(); fs.writeFileSync(archivoEntradas(), JSON.stringify(e, null, 2)); }
+
+/** Entradas para el panel (más recientes primero), con el formato del panel de n8n. */
+function panel(n = 40) {
+  return leerEntradas()
+    .sort((a, b) => String(b.fecha).localeCompare(String(a.fecha)))
+    .slice(0, n)
+    .map((e) => ({ id: e.id, tipo: e.tipo, negocio: e.negocio || '', titulo: e.titulo, detalle: String(e.detalle || '').slice(0, 1200), fuente: e.fuente || '', euros: Number(e.euros_estimados) || 0, estado: e.estado || '', fecha: e.fecha }));
+}
+
+function agregarEntrada(e) {
+  const entradas = leerEntradas();
+  const nueva = {
+    id: e.id || `j-${Date.now().toString(36)}-${crypto.randomBytes(2).toString('hex')}`,
+    tipo: e.tipo || 'nota', negocio: e.negocio || '', titulo: String(e.titulo || '').slice(0, 200),
+    estado: e.estado || 'pendiente_de_ver', euros_estimados: Number(e.euros_estimados) || 0,
+    fecha: e.fecha || new Date().toISOString(), fuente: e.fuente || '', detalle: String(e.detalle || '').slice(0, 4000),
+    origen: e.origen || 'jarvis',
+  };
+  entradas.push(nueva);
+  escribirEntradas(entradas);
+  return nueva;
+}
+
+function cambiarEstado(id, estado) {
+  const entradas = leerEntradas();
+  const e = entradas.find((x) => String(x.id) === String(id));
+  if (!e) return false;
+  e.estado = estado;
+  escribirEntradas(entradas);
+  return true;
+}
+
+/**
+ * Importa la memoria exportada de n8n ({origen, filas:[…]}) sin duplicar:
+ * cada fila queda con id "n8n-<id>".
+ * @returns {{importadas:number, yaEstaban:number}}
+ */
+function importarN8n(datos) {
+  const filas = Array.isArray(datos) ? datos : datos && datos.filas;
+  if (!Array.isArray(filas)) throw new Error('El archivo no tiene una lista "filas"');
+  const entradas = leerEntradas();
+  const ids = new Set(entradas.map((e) => String(e.id)));
+  let importadas = 0;
+  let yaEstaban = 0;
+  for (const f of filas) {
+    const id = `n8n-${f.id}`;
+    if (ids.has(id)) { yaEstaban++; continue; }
+    entradas.push({ id, tipo: f.tipo || 'nota', negocio: f.negocio || '', titulo: f.titulo || '', estado: f.estado || 'pendiente_de_ver',
+      euros_estimados: Number(f.euros_estimados) || 0, fecha: f.fecha || new Date().toISOString(), fuente: f.fuente || '', detalle: f.detalle || '', origen: 'n8n' });
+    ids.add(id);
+    importadas++;
+  }
+  escribirEntradas(entradas);
+  return { importadas, yaEstaban };
+}
+
+/** Busca importado-n8n.json en los sitios habituales y lo importa (sin duplicar). */
+function importarAutomatico(rutasPosibles) {
+  for (const r of rutasPosibles) {
+    try {
+      if (!fs.existsSync(r)) continue;
+      const res = importarN8n(JSON.parse(fs.readFileSync(r, 'utf8')));
+      return { ...res, archivo: r };
+    } catch (_) { /* archivo dañado: se ignora */ }
+  }
+  return null;
+}
+
+/** ¿Hay ya una idea de hoy? (máximo 1 idea al día) */
+function hayIdeaHoy() {
+  const hoy = new Date().toISOString().slice(0, 10);
+  return leerEntradas().some((e) => e.tipo === 'idea' && String(e.fecha).slice(0, 10) === hoy && e.origen !== 'n8n-prueba');
+}
+
+module.exports = { leerEntradas, panel, agregarEntrada, cambiarEstado, importarN8n, importarAutomatico, hayIdeaHoy,
+  guardarMensaje, ultimosMensajes, guardarHecho, borrarHecho, leerHechos, buscar, contexto, extraerHechos, detectarRecuerda, normalizar };

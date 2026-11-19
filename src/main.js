@@ -255,7 +255,17 @@ function registrarAtajo() {
 // ---------------------------------------------------------------------------
 const conectado = () => cfg && faltanUrls(cfg).length === 0;
 
+const usarN8n = () => Boolean(ajustes.leer().usarN8n);
+
 async function revisarPanel() {
+  // Sin n8n (por defecto): el panel sale de la memoria local de Jarvis.
+  if (!usarN8n()) {
+    const items = require('./memoria').panel();
+    ultimoPanel = { ok: true, local: true, items, revisado: new Date().toISOString() };
+    avisarNovedades(items, { silencioso: true }); // las rutinas ya avisan de lo suyo
+    enviar('panel:actualizado', ultimoPanel);
+    return ultimoPanel;
+  }
   if (!conectado()) {
     ultimoPanel = { ok: false, error: 'Jarvis aún no está conectado a n8n', items: [], revisado: new Date().toISOString(), sinConectar: true };
     return ultimoPanel;
@@ -267,10 +277,10 @@ async function revisarPanel() {
   return ultimoPanel;
 }
 
-function avisarNovedades(items) {
+function avisarNovedades(items, { silencioso = false } = {}) {
   const a = ajustes.leer();
   const vistos = new Set(a.idsVistos.map(String));
-  const primeraVez = a.idsVistos.length === 0;
+  const primeraVez = a.idsVistos.length === 0 || silencioso;
   const nuevos = items.filter((i) => !vistos.has(String(i.id)));
   if (nuevos.length === 0) return;
 
@@ -354,8 +364,8 @@ function registrarIpc() {
     // Solo se aceptan claves conocidas y con el tipo correcto.
     const limpio = {};
     if (typeof cambios.colorLed === 'string' && /^#[0-9a-f]{6}$/i.test(cambios.colorLed)) limpio.colorLed = cambios.colorLed;
-    for (const k of ['voz', 'conversacion', 'modoRgb', 'activacion', 'interrumpir', 'avisarMovilNovedades']) if (typeof cambios[k] === 'boolean') limpio[k] = cambios[k];
-    if (['auto', 'clasico', 'n8n'].includes(cambios.modoVoz)) limpio.modoVoz = cambios.modoVoz;
+    for (const k of ['voz', 'conversacion', 'modoRgb', 'activacion', 'interrumpir', 'avisarMovilNovedades', 'usarN8n']) if (typeof cambios[k] === 'boolean') limpio[k] = cambios[k];
+    if (['local', 'auto', 'clasico', 'n8n'].includes(cambios.modoVoz)) limpio.modoVoz = cambios.modoVoz;
     if (typeof cambios.volumen === 'number') limpio.volumen = Math.min(1, Math.max(0, cambios.volumen));
     if (typeof cambios.nombreVoz === 'string') limpio.nombreVoz = cambios.nombreVoz.slice(0, 200);
     if (typeof cambios.arranqueAutomatico === 'boolean') fijarArranque(cambios.arranqueAutomatico);
@@ -427,6 +437,7 @@ app.whenReady().then(async () => {
     ventana: () => ventana,
     mostrar: () => mostrarVentana(),
     panel: () => ultimoPanel,
+    refrescarPanel: () => revisarPanel(),
     icono: ICONO,
   });
   crearVentana();
@@ -436,7 +447,7 @@ app.whenReady().then(async () => {
   // Primera revisión del panel en cuanto carga la interfaz y luego cada X minutos.
   ventana.webContents.once('did-finish-load', async () => {
     await revisarPanel();
-    if (conectado()) iniciarRevisionPeriodica();
+    iniciarRevisionPeriodica();
     preguntarArranqueSiHaceFalta();
     if (RUTINA_INICIAL) servicios.ejecutarRutina(RUTINA_INICIAL, { desdeWindows: true });
   });

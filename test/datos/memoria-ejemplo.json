@@ -1,0 +1,126 @@
+{
+ "origen": "Datos INVENTADOS para pruebas (no son datos reales)",
+ "filas": [
+  {
+   "id": 1,
+   "tipo": "idea",
+   "negocio": "Negocio de ejemplo",
+   "titulo": "Entrada de ejemplo 1",
+   "estado": "pendiente_de_ver",
+   "euros_estimados": 100,
+   "fecha": "2026-11-06T10:00:00Z",
+   "fuente": "https://ejemplo.com",
+   "detalle": "Detalle inventado 1 para las pruebas."
+  },
+  {
+   "id": 2,
+   "tipo": "informe",
+   "negocio": "Negocio de ejemplo",
+   "titulo": "Entrada de ejemplo 2",
+   "estado": "pendiente_de_ver",
+   "euros_estimados": 200,
+   "fecha": "2026-11-07T10:00:00Z",
+   "fuente": "https://ejemplo.com",
+   "detalle": "Detalle inventado 2 para las pruebas."
+  },
+  {
+   "id": 3,
+   "tipo": "decision",
+   "negocio": "Negocio de ejemplo",
+   "titulo": "Entrada de ejemplo 3",
+   "estado": "en_curso",
+   "euros_estimados": 300,
+   "fecha": "2026-11-08T10:00:00Z",
+   "fuente": "https://ejemplo.com",
+   "detalle": "Detalle inventado 3 para las pruebas."
+  },
+  {
+   "id": 4,
+   "tipo": "informe",
+   "negocio": "Negocio de ejemplo",
+   "titulo": "Entrada de ejemplo 4",
+   "estado": "pendiente_de_ver",
+   "euros_estimados": 400,
+   "fecha": "2026-11-09T10:00:00Z",
+   "fuente": "https://ejemplo.com",
+   "detalle": "Detalle inventado 4 para las pruebas."
+  },
+  {
+   "id": 5,
+   "tipo": "informe",
+   "negocio": "Negocio de ejemplo",
+   "titulo": "Entrada de ejemplo 5",
+   "estado": "pendiente_de_ver",
+   "euros_estimados": 500,
+   "fecha": "2026-11-10T10:00:00Z",
+   "fuente": "https://ejemplo.com",
+   "detalle": "Detalle inventado 5 para las pruebas."
+  },
+  {
+   "id": 6,
+   "tipo": "idea",
+   "negocio": "Negocio de ejemplo",
+   "titulo": "Entrada de ejemplo 6",
+   "estado": "pendiente_de_ver",
+   "euros_estimados": 600,
+   "fecha": "2026-11-11T10:00:00Z",
+   "fuente": "https://ejemplo.com",
+   "detalle": "Detalle inventado 6 para las pruebas."
+  },
+  {
+   "id": 7,
+   "tipo": "informe",
+   "negocio": "Negocio de ejemplo",
+   "titulo": "Entrada de ejemplo 7",
+   "estado": "pendiente_de_ver",
+   "euros_estimados": 700,
+   "fecha": "2026-11-12T10:00:00Z",
+   "fuente": "https://ejemplo.com",
+   "detalle": "Detalle inventado 7 para las pruebas."
+  },
+  {
+   "id": 8,
+   "tipo": "idea",
+   "negocio": "Negocio de ejemplo",
+   "titulo": "Entrada de ejemplo 8",
+   "estado": "pendiente_de_ver",
+   "euros_estimados": 800,
+   "fecha": "2026-11-13T10:00:00Z",
+   "fuente": "https://ejemplo.com",
+   "detalle": "Detalle inventado 8 para las pruebas."
+  },
+  {
+   "id": 9,
+   "tipo": "informe",
+   "negocio": "Negocio de ejemplo",
+   "titulo": "Entrada de ejemplo 9",
+   "estado": "pendiente_de_ver",
+   "euros_estimados": 900,
+   "fecha": "2026-11-14T10:00:00Z",
+   "fuente": "https://ejemplo.com",
+   "detalle": "Detalle inventado 9 para las pruebas."
+  },
+  {
+   "id": 10,
+   "tipo": "idea",
+   "negocio": "Negocio de ejemplo",
+   "titulo": "Idea de ejemplo: maquinaria",
+   "estado": "pendiente_de_ver",
+   "euros_estimados": 1000,
+   "fecha": "2026-11-15T10:00:00Z",
+   "fuente": "https://ejemplo.com",
+   "detalle": "Detalle inventado 10 para las pruebas."
+  },
+  {
+   "id": 11,
+   "tipo": "informe",
+   "negocio": "Negocio de ejemplo",
+   "titulo": "Informe de ejemplo más reciente",
+   "estado": "pendiente_de_ver",
+   "euros_estimados": 1100,
+   "fecha": "2026-11-16T10:00:00Z",
+   "fuente": "https://ejemplo.com",
+   "detalle": "Detalle inventado 11 para las pruebas."
+  }
+ ]
+}

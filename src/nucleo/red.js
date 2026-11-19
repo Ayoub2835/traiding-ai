@@ -9,7 +9,10 @@ function host(url) {
 }
 
 function hostsPermitidos(cfg) {
-  const h = new Set(hostsN8n(cfg));
+  // n8n solo cuenta si está activado (es opcional).
+  let usarN8n = false;
+  try { usarN8n = Boolean(require('./ajustes').leer().usarN8n); } catch (_) { /* fuera de Electron */ }
+  const h = new Set(usarN8n ? hostsN8n(cfg) : []);
   const add = (u) => { const x = host(u); if (x) h.add(x); };
   if (claves.tiene('ANTHROPIC_API_KEY')) add(claves.obtener('ANTHROPIC_BASE_URL') || 'https://api.anthropic.com');
   if (claves.tiene('OPENAI_API_KEY')) add(claves.obtener('OPENAI_BASE_URL') || 'https://api.openai.com');
@@ -18,6 +21,7 @@ function hostsPermitidos(cfg) {
   if (claves.tiene('TWILIO_SID')) add('https://api.twilio.com');
   if (claves.tiene('SHOPIFY_TIENDA')) add(`https://${claves.obtener('SHOPIFY_TIENDA')}`);
   for (const u of (cfg && cfg.noticias) || []) add(u.url || u);
+  add('https://news.google.com'); // búsqueda gratis de las rutinas (Google News RSS)
   return h;
 }
 

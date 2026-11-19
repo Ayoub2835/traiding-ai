@@ -14,28 +14,37 @@ const { EJEMPLOS } = require('./monitores');
 
 const archivo = () => rutas.datos('rutinas.json');
 
+// Rutinas de negocio que antes hacía n8n (siempre presentes).
+const FIJAS = [
+  { id: 'informe', nombre: 'Informe diario', activo: true, horario: { tipo: 'diario', hora: '12:00' }, aviso: 'movil', ultima: null, windows: false },
+  { id: 'caza', nombre: 'Caza de oportunidades', activo: true, horario: { tipo: 'horas', horas: ['09:00', '13:00', '17:00', '21:00'] }, aviso: 'movil', ultima: null, windows: false },
+  // Sube el siguiente vídeo de la cola (src/youtube). Apagada hasta que la actives.
+  { id: 'youtube', nombre: 'Subir vídeo a YouTube', activo: false, horario: { tipo: 'diario', hora: '18:00' }, aviso: 'notificacion', ultima: null, windows: false },
+];
+
 function porDefecto() {
   return {
+    fijas: FIJAS.map((f) => ({ ...f })),
     resumen: { id: 'resumen', nombre: 'Resumen de la mañana', activo: true, horario: { tipo: 'diario', hora: '08:30' }, aviso: 'voz', ultima: null, windows: false },
-    // Sube el siguiente vídeo de la cola (src/youtube). Desactivada hasta que la actives.
-    youtube: { id: 'youtube', nombre: 'Subir vídeo a YouTube', activo: false, horario: { tipo: 'diario', hora: '18:00' }, aviso: 'notificacion', ultima: null, windows: false },
     monitores: EJEMPLOS.map((e) => ({ ...e, id: crypto.randomBytes(3).toString('hex'), activo: false, notas: '', ultima: null, ultimoResultado: null, windows: false })),
   };
 }
 
 function leer() {
-  try { return { ...porDefecto(), ...JSON.parse(fs.readFileSync(archivo(), 'utf8')) }; } catch (_) { return porDefecto(); }
+  let d;
+  try { d = { ...porDefecto(), ...JSON.parse(fs.readFileSync(archivo(), 'utf8')) }; } catch (_) { d = porDefecto(); }
+  // Quien ya tenía rutinas.json recibe también las fijas nuevas.
+  d.fijas = FIJAS.map((f) => ({ ...f, ...((d.fijas || []).find((x) => x.id === f.id) || {}) }));
+  return d;
 }
 function escribir(d) { fs.writeFileSync(archivo(), JSON.stringify(d, null, 2)); return d; }
 
-// Rutinas fijas (no se pueden quitar, solo activar/desactivar y cambiar la hora).
-const FIJAS = { resumen: 'Resumen de la mañana', youtube: 'Subir vídeo a YouTube' };
-
-function todas(d = leer()) { return [d.resumen, d.youtube, ...d.monitores]; }
+function todas(d = leer()) { return [...d.fijas, d.resumen, ...d.monitores]; }
 function obtener(id) { return todas().find((r) => r.id === id) || null; }
 
 function validarHorario(h) {
   if (h && h.tipo === 'diario' && /^([01]\d|2[0-3]):[0-5]\d$/.test(h.hora)) return { tipo: 'diario', hora: h.hora };
+  if (h && h.tipo === 'horas' && Array.isArray(h.horas) && h.horas.length && h.horas.every((x) => /^([01]\d|2[0-3]):[0-5]\d$/.test(x))) return { tipo: 'horas', horas: [...h.horas].sort() };
   if (h && h.tipo === 'cada' && Number(h.minutos) >= 15) return { tipo: 'cada', minutos: Math.round(Number(h.minutos)) };
   throw new Error('Horario no válido: usa "diario" con hora HH:MM o "cada" con 15 minutos o más');
 }
@@ -49,9 +58,14 @@ function guardar(r) {
     horario: validarHorario(r.horario),
     aviso: ['notificacion', 'movil', 'llamada', 'voz'].includes(r.aviso) ? r.aviso : 'notificacion',
   };
-  let id = r.id;
-  if (FIJAS[r.id]) {
-    d[r.id] = { ...d[r.id], ...limpio, nombre: FIJAS[r.id] };
+  let id = 'resumen';
+  const fija = FIJAS.find((f) => f.id === r.id);
+  if (fija) {
+    const x = d.fijas.find((f) => f.id === r.id);
+    Object.assign(x, limpio, { nombre: fija.nombre });
+    id = r.id;
+  } else if (r.id === 'resumen') {
+    d.resumen = { ...d.resumen, ...limpio, nombre: 'Resumen de la mañana' };
   } else {
     if (!String(r.instruccion || '').trim()) throw new Error('Falta qué debe vigilar');
     const base = d.monitores.find((m) => m.id === r.id);
@@ -98,6 +112,9 @@ function toca(r, ahora = new Date()) {
   if (!r.activo) return false;
   const ultima = r.ultima ? new Date(r.ultima) : null;
   if (r.horario.tipo === 'cada') return !ultima || ahora - ultima >= r.horario.minutos * 60000;
+  if (r.horario.tipo === 'horas') {
+    return r.horario.horas.some((hora) => toca({ ...r, horario: { tipo: 'diario', hora } }, ahora));
+  }
   const [h, m] = r.horario.hora.split(':').map(Number);
   const objetivo = new Date(ahora); objetivo.setHours(h, m, 0, 0);
   // Margen de 3 h: si encendiste el PC un poco tarde, aún se hace.
@@ -132,6 +149,17 @@ function iniciar(ejecutar) {
 // ---------------------------------------------------------------------------
 const nombreTarea = (id) => `Jarvis\\Rutina-${id}`;
 
+/** Lista de tareas de Windows para una rutina (una por hora si tiene varias). */
+function tareasWindows(r, exe, extra = []) {
+  if (r.horario.tipo !== 'horas') return [{ nombre: nombreTarea(r.id), crear: argsCrearWindows(r, exe, extra), borrar: argsBorrarWindows(r.id) }];
+  return r.horario.horas.map((hora) => {
+    const id = `${r.id}-${hora.replace(':', '')}`;
+    const crear = argsCrearWindows({ ...r, horario: { tipo: 'diario', hora } }, exe, extra);
+    crear[3] = nombreTarea(id);
+    return { nombre: nombreTarea(id), crear, borrar: argsBorrarWindows(id) };
+  });
+}
+
 /** Argumentos de schtasks para crear la tarea (sin ejecutar nada). */
 function argsCrearWindows(r, exe, extra = []) {
   const accion = `"${exe}" ${[...extra, `--rutina=${r.id}`].map((a) => (/\s/.test(a) ? `"${a}"` : a)).join(' ')}`;
@@ -157,8 +185,12 @@ function schtasks(args) {
 async function programarEnWindows(id, activar, exe, extra = []) {
   const r = obtener(id);
   if (!r) return { ok: false, error: 'Rutina no encontrada' };
-  const res = await schtasks(activar ? argsCrearWindows(r, exe, extra) : argsBorrarWindows(id));
-  registro.anotar({ origen: 'rutinas', accion: `${activar ? 'crear' : 'quitar'} tarea de Windows ${nombreTarea(id)}`, decision: res.ok ? 'hecho' : 'fallo', motivo: res.error });
+  let res = { ok: true };
+  for (const t of tareasWindows(r, exe, extra)) {
+    const x = await schtasks(activar ? t.crear : t.borrar);
+    registro.anotar({ origen: 'rutinas', accion: `${activar ? 'crear' : 'quitar'} tarea de Windows ${t.nombre}`, decision: x.ok ? 'hecho' : 'fallo', motivo: x.error });
+    if (!x.ok) res = x;
+  }
   if (res.ok) {
     const d = leer();
     const x = todas(d).find((y) => y.id === id);
@@ -168,4 +200,4 @@ async function programarEnWindows(id, activar, exe, extra = []) {
   return res;
 }
 
-module.exports = { leer, todas, obtener, guardar, quitar, anotarEjecucion, toca, iniciar, argsCrearWindows, argsBorrarWindows, programarEnWindows };
+module.exports = { leer, todas, obtener, guardar, quitar, anotarEjecucion, toca, iniciar, argsCrearWindows, argsBorrarWindows, tareasWindows, programarEnWindows };

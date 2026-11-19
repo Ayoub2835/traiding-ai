@@ -212,6 +212,18 @@ async function preguntar(entrada) {
       }
       return await respaldo(entrada, `Voz de n8n: ${r.error}`, turno);
     }
+    // GRATIS: Whisper en el PC (es / dárija / árabe / francés) y luego el router.
+    if (estado.modoVoz === 'local') {
+      const pcm = await window.VozJarvis.aPcm16k(entrada.blob);
+      ponerEstadoVoz('ENTENDIENDO…', 'pensando');
+      const t = await api.llamar('voz.transcribirLocal', pcm);
+      if (turno !== estado.turno) return false;
+      if (!t.ok) return await respaldo(entrada, t.error, turno);
+      if (!t.texto) { ponerEstadoVoz('NO TE HE ENTENDIDO', 'reposo'); return false; }
+      añadirMensaje('yo', t.texto);
+      $('transcripcion').textContent = t.texto;
+      return await responderTexto(t.texto, 'voz', turno);
+    }
     // Con OpenAI: transcribir (cualquier idioma) y pasar por el router.
     const t = await api.llamar('voz.transcribir', audio, entrada.mime);
     if (turno !== estado.turno) return false;
@@ -269,7 +281,7 @@ async function conversar() {
     return;
   }
   if (tiempoReal.activo) { tiempoReal.parar('parado'); return; }
-  if (!estado.conectado) return abrirConexion();
+  if (estado.modoVoz === 'n8n' && !estado.conectado) return abrirConexion();
   reproductor.parar();
   if (boca) boca.callar();
   activacion.pausar();
@@ -425,6 +437,13 @@ function tarjeta(item) {
     meta.appendChild(s);
   }
   div.appendChild(meta);
+  if (estado.panel && estado.panel.local && /pendiente/.test(String(item.estado || ''))) {
+    const b = document.createElement('button');
+    b.className = 'mini';
+    b.textContent = '✓ Visto';
+    b.addEventListener('click', () => api.llamar('memoria.estado', item.id, 'visto'));
+    div.appendChild(b);
+  }
   return div;
 }
 
@@ -461,7 +480,9 @@ function pintarPanel(panel) {
 function marcarRed(ok, motivo) {
   $('estadoRed').classList.toggle('ok', ok);
   $('estadoRed').classList.toggle('mal', !ok);
-  $('estadoRedTexto').textContent = ok ? 'n8n conectado' : (estado.conectado ? 'n8n sin conexión' : 'sin conectar');
+  const local = !(estado.ajustes && estado.ajustes.usarN8n);
+  $('estadoRedTexto').textContent = local ? 'Jarvis local' : ok ? 'n8n conectado' : (estado.conectado ? 'n8n sin conexión' : 'sin conectar');
+  if (local) { $('estadoRed').classList.add('ok'); $('estadoRed').classList.remove('mal'); }
   $('estadoRed').title = ok ? 'Conexión con n8n correcta' : motivo || '';
 }
 
@@ -546,6 +567,8 @@ function pintarAjustes() {
   $('ajInterrumpir').checked = !!a.interrumpir;
   $('ajModoVoz').value = a.modoVoz || 'auto';
   $('ajMovil').checked = !!a.avisarMovilNovedades;
+  $('ajN8n').checked = !!a.usarN8n;
+  $('btnConexion').classList.toggle('oculto', !a.usarN8n);
   $('ajArranque').checked = !!estado.info.arrancaConWindows;
   $('filaArranque').classList.toggle('oculto', !estado.info.puedeArrancarSolo);
   aplicarColor(a.colorLed);
@@ -581,6 +604,18 @@ $('ajNombreVoz').addEventListener('change', (e) => guardar({ nombreVoz: e.target
 $('ajConversacion').addEventListener('change', (e) => guardar({ conversacion: e.target.checked }));
 $('ajInterrumpir').addEventListener('change', (e) => guardar({ interrumpir: e.target.checked }));
 $('ajMovil').addEventListener('change', (e) => guardar({ avisarMovilNovedades: e.target.checked }));
+$('ajN8n').addEventListener('change', async (e) => {
+  await guardar({ usarN8n: e.target.checked });
+  await window.__actualizarModoVoz();
+  if (e.target.checked && !estado.conectado) await abrirConexion();
+  await api.revisarPanel();
+  window.Pestanas?.pintarServicios();
+});
+$('btnImportar').addEventListener('click', async () => {
+  const r = await api.llamar('memoria.importar');
+  if (r.ok) añadirMensaje('sistema', `Memoria importada: ${r.importadas} nuevas, ${r.yaEstaban} ya estaban.`);
+  else if (r.error !== 'Cancelado') mostrarError(r.error);
+});
 $('ajModoVoz').addEventListener('change', async (e) => { await guardar({ modoVoz: e.target.value }); await window.__actualizarModoVoz(); window.Pestanas?.pintarServicios(); });
 $('ajArranque').addEventListener('change', (e) => guardar({ arranqueAutomatico: e.target.checked }));
 $('btnProbarVoz').addEventListener('click', () => {
@@ -646,7 +681,7 @@ async function saludar() {
   if (sessionStorage.getItem('saludado')) return;
   sessionStorage.setItem('saludado', '1');
   const textoLocal = textoSaludo();
-  if (!estado.ajustes.voz || estado.panel.ok === false) {
+  if (!estado.ajustes.voz || estado.panel.ok === false || !estado.ajustes.usarN8n) {
     añadirMensaje('jarvis', textoLocal);
     return decir({ texto: textoLocal });
   }
@@ -693,10 +728,10 @@ async function iniciar() {
     : estado.info.atajo.error;
   if (!estado.info.atajo.ok && estado.info.atajo.error) añadirMensaje('error', '⚠ ' + estado.info.atajo.error);
 
-  // Primera vez: pantalla "Conectar Jarvis".
+  // Pantalla "Conectar Jarvis": solo si activas n8n (opcional) y faltan sus URLs.
   const conexion = await api.estadoConexion();
   estado.conectado = conexion.faltan.length === 0;
-  if (!estado.conectado) {
+  if (!estado.conectado && estado.ajustes.usarN8n) {
     marcarRed(false, 'Sin conectar');
     await abrirConexion();
   }

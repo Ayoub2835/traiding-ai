@@ -11,28 +11,47 @@ const { EventEmitter } = require('events');
 const claves = require('../nucleo/claves');
 const { pedir } = require('../nucleo/http');
 const idioma = require('../cerebro/idioma');
+const edge = require('./edge');
+const whisper = require('./whisper');
 
 const baseOpenAI = () => (claves.obtener('OPENAI_BASE_URL') || 'https://api.openai.com').replace(/\/+$/, '');
 
 /**
  * Elige el modo de voz.
- * @param {'auto'|'clasico'|'n8n'} preferencia  auto = tiempo real si hay clave;
- *   clasico = grabar y transcribir (OpenAI) sin tiempo real; n8n = flujo de n8n.
+ * @param {'local'|'auto'|'clasico'|'n8n'} preferencia
+ *   local   = GRATIS: Whisper en el PC para entender y Edge TTS para hablar (por defecto)
+ *   auto    = tiempo real (OpenAI Realtime / Gemini Live) si hay clave; si no, local
+ *   clasico = grabar y transcribir con OpenAI (de pago)
+ *   n8n     = el flujo de voz de n8n (solo si n8n está activado)
  */
-function modo(preferencia = 'auto') {
+function modo(preferencia = 'local', { usarN8n = false } = {}) {
   const openai = claves.tiene('OPENAI_API_KEY');
   const gemini = claves.tiene('GEMINI_API_KEY');
-  if (preferencia === 'n8n') return 'n8n';
-  if (preferencia === 'clasico') return openai ? 'openai' : 'n8n';
-  if (openai) return 'realtime-openai';
-  if (gemini) return 'realtime-gemini';
-  return 'n8n';
+  if (preferencia === 'n8n') return usarN8n ? 'n8n' : 'local';
+  if (preferencia === 'clasico') return openai ? 'openai' : 'local';
+  if (preferencia === 'auto') {
+    if (openai) return 'realtime-openai';
+    if (gemini) return 'realtime-gemini';
+  }
+  return 'local';
 }
 
 // ---------------------------------------------------------------------------
 // Texto → voz (OpenAI). Devuelve mp3 en base64, o null si no hay clave.
 // ---------------------------------------------------------------------------
-async function sintetizar(texto, { voz } = {}) {
+// Voz de Jarvis: Edge TTS (gratis) primero; OpenAI solo si se pide y hay clave;
+// si nada funciona, null → la ventana usa la voz de Windows.
+async function sintetizar(texto, { lang, usarOpenAI = false } = {}) {
+  if (!String(texto || '').trim()) return null;
+  if (!usarOpenAI) {
+    const e = await edge.sintetizar(texto, lang);
+    if (!e.error) return e;
+    if (!claves.tiene('OPENAI_API_KEY')) return { error: e.error };
+  }
+  return sintetizarOpenAI(texto);
+}
+
+async function sintetizarOpenAI(texto, { voz } = {}) {
   if (!claves.tiene('OPENAI_API_KEY') || !String(texto || '').trim()) return null;
   const r = await pedir(`${baseOpenAI()}/v1/audio/speech`, {
     method: 'POST',
@@ -180,4 +199,4 @@ class SesionGemini extends EventEmitter {
   cerrar() { try { this.ws && this.ws.close(); } catch (_) { /* ya cerrada */ } this.ws = null; }
 }
 
-module.exports = { modo, sintetizar, transcribir, sesionOpenAI, SesionGemini, HERRAMIENTA, instrucciones, LOCALE: idioma.LOCALE };
+module.exports = { modo, sintetizar, sintetizarOpenAI, transcribir, transcribirLocal: (a) => whisper.transcribir(a), cargarWhisper: whisper.cargar, estadoWhisper: whisper.estado, sesionOpenAI, SesionGemini, HERRAMIENTA, instrucciones, LOCALE: idioma.LOCALE };

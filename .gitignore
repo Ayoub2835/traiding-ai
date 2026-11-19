@@ -8,3 +8,5 @@ config.json
 .env
 .env.*
 !.env.ejemplo
+# Memoria personal (el repositorio es PÚBLICO: no se sube)
+memoria/
