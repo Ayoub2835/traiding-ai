@@ -166,6 +166,26 @@ async function ejecutarRutina(id, { desdeWindows = false } = {}) {
 }
 
 // Cambiar el Programador de tareas de Windows: SIEMPRE con confirmación.
+// Primera vez en Windows: una sola pregunta para programar el informe diario y
+// la caza de oportunidades en el Programador de tareas (es un ajuste de Windows).
+async function programarRutinasIniciales() {
+  if (process.platform !== 'win32' || ajustes.leer().rutinasWindowsPreguntado) return;
+  const { response } = await dialog.showMessageBox(ctx.ventana(), {
+    type: 'question', buttons: ['Sí, programarlas', 'Ahora no'], defaultId: 0, cancelId: 1, title: 'Jarvis',
+    message: '¿Programo tus rutinas en Windows?',
+    detail: 'Informe diario a las 12:00 y caza de oportunidades a las 9, 13, 17 y 21 h, aunque Jarvis esté cerrado. Se crean tareas en el Programador de tareas (carpeta Jarvis); puedes quitarlas en la pestaña Rutinas.',
+  });
+  ajustes.actualizar({ rutinasWindowsPreguntado: true });
+  if (response !== 0) return;
+  const extra = app.isPackaged ? [] : [rutas.RAIZ];
+  for (const id of ['informe', 'caza']) {
+    const r = await programador.programarEnWindows(id, true, process.execPath, extra);
+    if (!r.ok) enviar('sistema', `No pude programar ${id} en Windows: ${r.error}`);
+  }
+  enviar('sistema', 'Rutinas programadas en Windows: informe 12:00 y caza 9, 13, 17 y 21 h.');
+  enviar('rutinas', programador.todas());
+}
+
 async function programarWindows(id, activar) {
   const r = programador.obtener(id);
   if (!r) return { ok: false, error: 'Rutina no encontrada' };
@@ -347,4 +367,4 @@ function iniciar(contexto) {
   });
 }
 
-module.exports = { iniciar, ejecutarRutina, ACCIONES };
+module.exports = { iniciar, ejecutarRutina, programarRutinasIniciales, ACCIONES };

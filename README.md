@@ -18,6 +18,16 @@ Basado en parte en ideas y código adaptado de [OpenJarvis](https://github.com/o
 
 ## Actualizar la app en tu PC
 
+**Con un solo comando** (recomendado): pulsa `Windows + R`, escribe `powershell`, pulsa Intro y pega:
+
+```powershell
+irm https://raw.githubusercontent.com/ayoub2835/traiding-ai/claude/lucid-hawking-kithaj/ACTUALIZAR-JARVIS.ps1 | iex
+```
+
+Descarga la última versión en `Documentos\Jarvis-app`, copia tu `importado-n8n.json` si está en Descargas, ejecuta el instalador y abre las páginas para crear tus claves gratis. Al abrir Jarvis te pregunta si programa el informe y la caza en Windows.
+
+**A mano:**
+
 1. Descarga la última versión de la rama `claude/lucid-hawking-kithaj` (botón *Code → Download ZIP* en GitHub, o `git pull` si usas Git) y descomprímela encima de la carpeta anterior.
 2. Copia tu `importado-n8n.json` en la carpeta `memoria` del proyecto, en `Documentos\Jarvis` o en `Descargas` (Jarvis lo importa solo, sin duplicar). También puedes usar *Ajustes → Importar memoria*.
 3. Haz doble clic en **`INSTALAR-JARVIS.bat`** e instala encima de la versión anterior (tus ajustes, claves y memoria se conservan).
