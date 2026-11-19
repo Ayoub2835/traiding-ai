@@ -33,6 +33,10 @@ const CATALOGO = [
   { clave: 'N8N_MCP_URL', grupo: 'Manos', etiqueta: 'URL MCP de n8n (opcional)', ayuda: 'n8n → Settings → MCP access. Deja que las manos lean/editen flujos.' },
   { clave: 'N8N_MCP_TOKEN', grupo: 'Manos', etiqueta: 'Token MCP de n8n', secreta: true },
   { clave: 'CLAUDE_CODE_RUTA', grupo: 'Manos', etiqueta: 'Comando de Claude Code', defecto: 'claude' },
+  { clave: 'YOUTUBE_CLIENT_ID', grupo: 'YouTube', etiqueta: 'ID de cliente de Google (OAuth)', ayuda: 'console.cloud.google.com → activa "YouTube Data API v3" → Pantalla de consentimiento (publícala, o el permiso caduca a los 7 días) → Credenciales → ID de cliente OAuth tipo "App de escritorio".' },
+  { clave: 'YOUTUBE_CLIENT_SECRET', grupo: 'YouTube', etiqueta: 'Secreto de cliente de Google', secreta: true },
+  { clave: 'YOUTUBE_REFRESH_TOKEN', grupo: 'YouTube', etiqueta: 'Permiso del canal (se rellena al pulsar «Conectar YouTube»)', secreta: true, ayuda: 'No lo escribas a mano: pestaña Rutinas → Subir vídeo a YouTube → Conectar YouTube.' },
+  { clave: 'YOUTUBE_PRIVACIDAD', grupo: 'YouTube', etiqueta: 'Visibilidad por defecto (public/unlisted/private)', defecto: 'public', ayuda: 'Hasta que Google audite tu proyecto, YouTube deja PRIVADOS los vídeos subidos por API.' },
   { clave: 'ANTHROPIC_BASE_URL', grupo: 'Avanzado', etiqueta: 'URL base de la API de Anthropic (solo pruebas)' },
   { clave: 'OPENAI_BASE_URL', grupo: 'Avanzado', etiqueta: 'URL base de la API de OpenAI (solo pruebas)' },
 ];
@@ -146,6 +150,9 @@ const PRUEBAS = {
     const r = await pedir(`https://${obtener('SHOPIFY_TIENDA')}/admin/api/2025-07/shop.json`, { headers: { 'X-Shopify-Access-Token': obtener('SHOPIFY_TOKEN') } }, 20);
     return r.ok ? `Shopify OK (${r.datos?.shop?.name || 'tienda'})` : r.error;
   },
+};
+PRUEBAS.YOUTUBE_REFRESH_TOKEN = async () => {
+  try { return await require('../youtube').probarConexion(); } catch (e) { return e.message; }
 };
 PRUEBAS.OLLAMA_MODELO = PRUEBAS.OLLAMA_URL;
 PRUEBAS.TWILIO_TOKEN = PRUEBAS.TWILIO_SID;

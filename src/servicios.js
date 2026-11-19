@@ -5,7 +5,7 @@
 // acciones de la lista ACCIONES. Los avisos hacia la interfaz van por el canal
 // 'jarvis:evento' ({tipo, datos}).
 'use strict';
-const { ipcMain, Notification, dialog, app } = require('electron');
+const { ipcMain, Notification, dialog, app, shell } = require('electron');
 const claves = require('./nucleo/claves');
 const ajustes = require('./nucleo/ajustes');
 const rutas = require('./nucleo/rutas');
@@ -24,6 +24,7 @@ const monitores = require('./rutinas/monitores');
 const programador = require('./rutinas/programador');
 const confirmacion = require('./seguridad/confirmacion');
 const registro = require('./seguridad/registro');
+const youtube = require('./youtube');
 
 let ctx = null;        // { cfg(), ventana(), mostrar(), panel(), icono }
 let cerebro = null;
@@ -103,7 +104,9 @@ async function ejecutarRutina(id, { desdeWindows = false } = {}) {
     enviar('rutina', { id, nombre: r.nombre, ...res, hablar: true });
     return res;
   }
-  const res = await monitores.ejecutar(r, { n8nChat, manos: (t) => manosYEsperar(t, `monitor:${r.nombre}`), pensar: cerebro.pensar });
+  const res = id === 'youtube'
+    ? await youtube.ejecutar({ pensar: cerebro.pensar })
+    : await monitores.ejecutar(r, { n8nChat, manos: (t) => manosYEsperar(t, `monitor:${r.nombre}`), pensar: cerebro.pensar });
   programador.anotarEjecucion(id, res);
   if (res.ok && res.novedad) {
     if (Notification.isSupported()) new Notification({ title: `👁 ${r.nombre}`, body: res.resumen, icon: ctx.icono }).show();
@@ -202,6 +205,10 @@ const ACCIONES = {
   'rutinas.quitar': (id) => { const ok = programador.quitar(id); enviar('rutinas', programador.todas()); return ok; },
   'rutinas.ejecutar': (id) => ejecutarRutina(id),
   'rutinas.windows': (id, activar) => programarWindows(id, Boolean(activar)),
+  // YouTube
+  'youtube.estado': () => youtube.estado(),
+  'youtube.conectar': () => youtube.conectar((url) => shell.openExternal(url)),
+  'youtube.abrirCarpeta': async () => { const e = await shell.openPath(youtube.carpeta('pendientes')); return e ? { ok: false, error: e } : { ok: true }; },
   // Memoria
   'memoria.hechos': () => memoria.leerHechos().slice().reverse(),
   'memoria.borrarHecho': (id) => memoria.borrarHecho(id),

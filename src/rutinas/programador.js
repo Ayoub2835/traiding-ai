@@ -17,6 +17,8 @@ const archivo = () => rutas.datos('rutinas.json');
 function porDefecto() {
   return {
     resumen: { id: 'resumen', nombre: 'Resumen de la mañana', activo: true, horario: { tipo: 'diario', hora: '08:30' }, aviso: 'voz', ultima: null, windows: false },
+    // Sube el siguiente vídeo de la cola (src/youtube). Desactivada hasta que la actives.
+    youtube: { id: 'youtube', nombre: 'Subir vídeo a YouTube', activo: false, horario: { tipo: 'diario', hora: '18:00' }, aviso: 'notificacion', ultima: null, windows: false },
     monitores: EJEMPLOS.map((e) => ({ ...e, id: crypto.randomBytes(3).toString('hex'), activo: false, notas: '', ultima: null, ultimoResultado: null, windows: false })),
   };
 }
@@ -26,7 +28,10 @@ function leer() {
 }
 function escribir(d) { fs.writeFileSync(archivo(), JSON.stringify(d, null, 2)); return d; }
 
-function todas(d = leer()) { return [d.resumen, ...d.monitores]; }
+// Rutinas fijas (no se pueden quitar, solo activar/desactivar y cambiar la hora).
+const FIJAS = { resumen: 'Resumen de la mañana', youtube: 'Subir vídeo a YouTube' };
+
+function todas(d = leer()) { return [d.resumen, d.youtube, ...d.monitores]; }
 function obtener(id) { return todas().find((r) => r.id === id) || null; }
 
 function validarHorario(h) {
@@ -44,9 +49,9 @@ function guardar(r) {
     horario: validarHorario(r.horario),
     aviso: ['notificacion', 'movil', 'llamada', 'voz'].includes(r.aviso) ? r.aviso : 'notificacion',
   };
-  let id = 'resumen';
-  if (r.id === 'resumen') {
-    d.resumen = { ...d.resumen, ...limpio, nombre: 'Resumen de la mañana' };
+  let id = r.id;
+  if (FIJAS[r.id]) {
+    d[r.id] = { ...d[r.id], ...limpio, nombre: FIJAS[r.id] };
   } else {
     if (!String(r.instruccion || '').trim()) throw new Error('Falta qué debe vigilar');
     const base = d.monitores.find((m) => m.id === r.id);
