@@ -448,7 +448,7 @@ app.whenReady().then(async () => {
   ventana.webContents.once('did-finish-load', async () => {
     await revisarPanel();
     iniciarRevisionPeriodica();
-    preguntarArranqueSiHaceFalta();
+    preguntarArranqueSiHaceFalta().then(() => servicios.programarRutinasIniciales());
     if (RUTINA_INICIAL) servicios.ejecutarRutina(RUTINA_INICIAL, { desdeWindows: true });
   });
 });
