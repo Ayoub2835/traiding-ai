@@ -123,9 +123,45 @@ async function pintarRutinas(lista) {
       const res = await api.llamar('rutinas.windows', r.id, !r.windows);
       if (!res.ok && res.error !== 'Cancelado') ui.mostrarError(res.error);
     }));
-    if (r.id !== 'resumen') botones.append(boton('Quitar', async () => { await api.llamar('rutinas.quitar', r.id); }, 'peligro'));
+    if (r.id === 'youtube') pintarYoutube(c, r, botones);
+    // Las rutinas fijas no se pueden quitar (solo activar/desactivar).
+    if (!['resumen', 'informe', 'caza', 'youtube'].includes(r.id)) botones.append(boton('Quitar', async () => { await api.llamar('rutinas.quitar', r.id); }, 'peligro'));
     c.append(botones);
     return c;
+  }));
+}
+
+// Tarjeta de YouTube: estado del canal, cola, hora de subida y botones propios.
+function pintarYoutube(c, r, botones) {
+  const info = el('div', 'meta', 'Comprobando YouTube…');
+  const fila = el('div', 'ajuste-botones');
+  const horaInp = el('input', '', null, { type: 'time', value: r.horario.tipo === 'diario' ? r.horario.hora : '18:00', title: 'Hora de subida diaria' });
+  horaInp.addEventListener('change', async () => {
+    if (!horaInp.value) return;
+    const res = await api.llamar('rutinas.guardar', { ...r, horario: { tipo: 'diario', hora: horaInp.value } });
+    if (res && res.ok === false) ui.mostrarError(res.error);
+  });
+  fila.append(el('span', 'meta', 'Subir cada día a las'), horaInp);
+  c.append(info, fila);
+  api.llamar('youtube.estado').then((e) => {
+    if (!e || e.ok === false) { info.textContent = (e && e.error) || 'No se pudo leer el estado de YouTube'; return; }
+    const canal = e.conectado ? '✔ canal conectado' : (e.configurado ? '✘ falta pulsar «Conectar YouTube»' : '✘ faltan las claves de Google (Ajustes → Claves → YouTube)');
+    info.textContent = `${canal} · ${e.pendientes} vídeo${e.pendientes === 1 ? '' : 's'} en la cola`;
+    info.title = e.carpeta;
+    if (e.ultimos[0]) c.insertBefore(el('div', 'detalle', `Último: «${e.ultimos[0].titulo}» · ${e.ultimos[0].url}`, { dir: 'auto' }), fila.nextSibling);
+  });
+  botones.append(boton('Conectar YouTube', async (ev) => {
+    ev.target.disabled = true;
+    ui.añadirMensaje('sistema', 'Abriendo el navegador: elige tu canal y da permiso a Jarvis para subir vídeos.');
+    const res = await api.llamar('youtube.conectar');
+    ev.target.disabled = false;
+    if (!res.ok) return ui.mostrarError(`YouTube: ${res.error}`);
+    ui.añadirMensaje('sistema', `YouTube conectado${res.canal ? ` (canal ${res.canal})` : ''}. Pon vídeos en la carpeta y activa la rutina.`);
+    pintarRutinas();
+  }));
+  botones.append(boton('Abrir carpeta de vídeos', async () => {
+    const res = await api.llamar('youtube.abrirCarpeta');
+    if (!res.ok) ui.mostrarError(res.error);
   }));
 }
 $('monTipo').addEventListener('change', () => { $('monValor').value = $('monTipo').value === 'diario' ? '09:00' : '240'; });

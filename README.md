@@ -103,6 +103,18 @@ Si el elegido falla, prueba el siguiente (Gemini → Ollama → Claude → n8n s
 - **Resumen de la mañana** (08:30): correos, pendientes, tareas y noticias, en voz alta.
 - **Monitores**: «vigila X y avísame» o *Rutinas → Nuevo monitor*. Recuerdan lo de la vez anterior y solo avisan si hay novedad.
 - Mientras Jarvis está abierto, se ejecutan solos. Para que funcionen con Jarvis cerrado, pulsa **Programar en Windows** (crea una tarea por cada hora en el Programador de tareas, carpeta `Jarvis`; siempre pregunta antes).
+- **Subir vídeo a YouTube** (apagada al principio): cada día, a la hora que elijas, sube el siguiente vídeo de tu cola.
+
+### YouTube: subida diaria automática
+
+1. En [console.cloud.google.com](https://console.cloud.google.com): crea un proyecto, activa **YouTube Data API v3**, configura la **pantalla de consentimiento** (tipo Externo, añade tu cuenta) y **publícala** (en modo «Prueba» el permiso caduca cada 7 días). Después, *Credenciales → Crear ID de cliente OAuth → App de escritorio*.
+2. En Jarvis: *Ajustes → Claves → YouTube*, pega el **ID de cliente** y el **secreto**.
+3. *Rutinas → Subir vídeo a YouTube → Conectar YouTube*: se abre el navegador, eliges tu canal y das permiso (solo subir vídeos y leer el nombre del canal).
+4. *Abrir carpeta de vídeos* y mete ahí tus vídeos (`%APPDATA%\Jarvis\youtube\pendientes`). Se suben por orden alfabético: ponles `01-`, `02-`… delante.
+   - Título y descripción: un `.json` con el mismo nombre (`{"titulo":"…","descripcion":"…","etiquetas":["…"],"privacidad":"public"}`) o un `.txt` (1.ª línea = título, resto = descripción). Si no pones nada, Claude los escribe a partir del nombre del archivo.
+5. Elige la hora, activa la rutina y, si quieres que funcione con Jarvis cerrado, pulsa **Programar en Windows**.
+
+Los vídeos subidos pasan a `youtube\subidos` y quedan en `youtube\historial.json`; si una subida falla, el vídeo se queda en la cola y se reintenta al día siguiente. **Importante:** hasta que Google apruebe la auditoría de tu proyecto (formulario «YouTube API Services – Audit and Quota Extension»), YouTube deja **privados** los vídeos subidos por API; Jarvis te avisa si pasa. Y YouTube penaliza el contenido repetitivo o generado en masa: sube vídeos con valor propio.
 
 ## Desarrollo
 

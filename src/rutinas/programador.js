@@ -18,6 +18,8 @@ const archivo = () => rutas.datos('rutinas.json');
 const FIJAS = [
   { id: 'informe', nombre: 'Informe diario', activo: true, horario: { tipo: 'diario', hora: '12:00' }, aviso: 'movil', ultima: null, windows: false },
   { id: 'caza', nombre: 'Caza de oportunidades', activo: true, horario: { tipo: 'horas', horas: ['09:00', '13:00', '17:00', '21:00'] }, aviso: 'movil', ultima: null, windows: false },
+  // Sube el siguiente vídeo de la cola (src/youtube). Apagada hasta que la actives.
+  { id: 'youtube', nombre: 'Subir vídeo a YouTube', activo: false, horario: { tipo: 'diario', hora: '18:00' }, aviso: 'notificacion', ultima: null, windows: false },
 ];
 
 function porDefecto() {
