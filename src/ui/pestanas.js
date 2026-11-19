@@ -159,6 +159,15 @@ function pintarYoutube(c, r, botones) {
     ui.añadirMensaje('sistema', `YouTube conectado${res.canal ? ` (canal ${res.canal})` : ''}. Pon vídeos en la carpeta y activa la rutina.`);
     pintarRutinas();
   }));
+  botones.append(boton('🎬 Crear vídeo ahora', async (ev) => {
+    ev.target.disabled = true;
+    ui.añadirMensaje('sistema', 'Creando el vídeo de hoy (datos, guion, voz y montaje). Puede tardar unos minutos…');
+    const res = await api.llamar('youtube.crearAhora');
+    ev.target.disabled = false;
+    if (!res.ok) return ui.mostrarError(res.error);
+    ui.añadirMensaje('sistema', `Vídeo listo: «${res.titulo}» (${res.escenas} escenas). Te abro la carpeta para que lo veas; se subirá en la próxima rutina.`);
+    pintarRutinas();
+  }));
   botones.append(boton('Abrir carpeta de vídeos', async () => {
     const res = await api.llamar('youtube.abrirCarpeta');
     if (!res.ok) ui.mostrarError(res.error);

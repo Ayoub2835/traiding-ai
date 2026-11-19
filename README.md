@@ -104,6 +104,12 @@ Si el elegido falla, prueba el siguiente (Gemini → Ollama → Claude → n8n s
    - Título y descripción: un `.json` con el mismo nombre (`{"titulo":"…","descripcion":"…","etiquetas":["…"],"privacidad":"public"}`) o un `.txt` (1.ª línea = título, resto = descripción). Si no pones nada, Claude los escribe a partir del nombre del archivo.
 5. Elige la hora, activa la rutina y, si quieres que funcione con Jarvis cerrado, pulsa **Programar en Windows**.
 
+**Jarvis crea los vídeos solo (gratis).** Si la cola está vacía cuando toca subir, Jarvis crea el resumen cripto del día (1-2 minutos, 1920x1080) y lo sube:
+- **Datos reales** sin claves: precios y gráfico de 7 días de Bitcoin, Ethereum, Solana, BNB y XRP (CoinGecko), índice de miedo y codicia (alternative.me) y 3 noticias de Google News.
+- **Guion** de Claude o Gemini usando *solo* esos datos (sin cerebro disponible, una plantilla). Nunca da consejos de inversión y cada vídeo lleva el aviso legal y las fuentes en la descripción.
+- **Voz** gratis de Edge TTS y **montaje** con ffmpeg (incluido en Jarvis): diapositivas con zoom suave.
+- Botón **🎬 Crear vídeo ahora** para generarlo y verlo antes de que se publique. Para subir solo tus propios vídeos, pon `YOUTUBE_CREAR=no` en *Ajustes → Claves*. El nombre del canal que sale en los vídeos se cambia en `YOUTUBE_CANAL_NOMBRE`.
+
 Los vídeos subidos pasan a `youtube\subidos` y quedan en `youtube\historial.json`; si una subida falla, el vídeo se queda en la cola y se reintenta al día siguiente. **Importante:** hasta que Google apruebe la auditoría de tu proyecto (formulario «YouTube API Services – Audit and Quota Extension»), YouTube deja **privados** los vídeos subidos por API; Jarvis te avisa si pasa. Y YouTube penaliza el contenido repetitivo o generado en masa: sube vídeos con valor propio.
 
 ## Desarrollo

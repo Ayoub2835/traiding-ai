@@ -274,9 +274,15 @@ const estaConectado = () => Boolean(claves.obtener('YOUTUBE_REFRESH_TOKEN'));
  * Ejecuta la rutina: sube el siguiente vídeo de la cola.
  * Devuelve { ok, novedad, resumen, url? } como los monitores.
  */
-async function ejecutar({ pensar } = {}) {
+async function ejecutar({ pensar, crear } = {}) {
   if (!estaConectado()) return { ok: false, error: 'YouTube no está conectado: pulsa «Conectar YouTube» en la pestaña Rutinas' };
-  const lista = cola();
+  let lista = cola();
+  // Cola vacía: si está activado (por defecto sí), Jarvis crea el vídeo del día.
+  if (!lista.length && crear && claves.obtener('YOUTUBE_CREAR') !== 'no') {
+    const c = await crear();
+    if (!c.ok) return { ok: false, error: c.error };
+    lista = cola();
+  }
   if (!lista.length) {
     return { ok: true, novedad: true, resumen: `No hay vídeos en la cola de YouTube. Añade alguno en ${carpeta('pendientes')}` };
   }

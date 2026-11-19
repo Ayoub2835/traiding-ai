@@ -29,6 +29,7 @@ const correo = require('./correo');
 const negocio = require('./rutinas/negocio');
 const busqueda = require('./rutinas/busqueda');
 const youtube = require('./youtube');
+const creadorVideos = require('./youtube/creador');
 const path = require('path');
 
 let ctx = null;        // { cfg(), ventana(), mostrar(), panel(), icono }
@@ -150,7 +151,7 @@ async function ejecutarRutina(id, { desdeWindows = false } = {}) {
     return res;
   }
   const res = id === 'youtube'
-    ? await youtube.ejecutar({ pensar: cerebro.pensar })
+    ? await youtube.ejecutar({ pensar: cerebro.pensar, crear: () => creadorVideos.crear({ pensar: cerebro.pensar }) })
     : await monitores.ejecutar(r, { n8nChat: (t) => (usarN8n() && r.motor === 'n8n' ? n8nChat(t) : buscarWeb(t)), manos: (t) => manosYEsperar(t, `monitor:${r.nombre}`), pensar: cerebro.pensar });
   programador.anotarEjecucion(id, res);
   if (res.ok && res.novedad) {
@@ -260,6 +261,12 @@ const ACCIONES = {
   // YouTube
   'youtube.estado': () => youtube.estado(),
   'youtube.conectar': () => youtube.conectar((url) => shell.openExternal(url)),
+  // Crea el vídeo de hoy y lo deja en la cola (sin subirlo) para que lo veas antes.
+  'youtube.crearAhora': async () => {
+    const r = await creadorVideos.crear({ pensar: cerebro.pensar });
+    if (r.ok) shell.showItemInFolder(r.video);
+    return r;
+  },
   'youtube.abrirCarpeta': async () => { const e = await shell.openPath(youtube.carpeta('pendientes')); return e ? { ok: false, error: e } : { ok: true }; },
   // Memoria
   'memoria.hechos': () => memoria.leerHechos().slice().reverse(),

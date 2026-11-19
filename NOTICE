@@ -22,3 +22,6 @@ Otros componentes de terceros incluidos en la app instalada:
   - Vosk / vosk-browser (Apache 2.0) y el modelo vosk-model-small-es-0.42 (Apache 2.0)
   - Noto Sans Arabic (SIL Open Font License 1.1) vía @fontsource/noto-sans-arabic
   - Electron (MIT), @anthropic-ai/sdk (MIT), smol-toml (BSD-3-Clause)
+  - ffmpeg-static (GPL-3.0-or-later): binario de FFmpeg para montar los vídeos de
+    YouTube; código fuente en https://ffmpeg.org y https://github.com/eugeneware/ffmpeg-static
+  - sharp (Apache 2.0) con libvips (LGPL-3.0): diapositivas de los vídeos
