@@ -348,4 +348,4 @@ async function crear({ pensar, dep = {} } = {}) {
   }
 }
 
-module.exports = { crear, mercado, guion, guionPlantilla, escenas, montarEscena, ffmpeg, rutaFfmpeg, AVISO, _svg: { svgPortada, svgPrecios, svgGrafico, svgSentimiento, svgNoticia, svgCierre } };
+module.exports = { crear, mercado, guion, guionPlantilla, escenas, montarEscena, ffmpeg, duracion, rutaFfmpeg, AVISO, canal, _svg: { svgPortada, svgPrecios, svgGrafico, svgSentimiento, svgNoticia, svgCierre } };

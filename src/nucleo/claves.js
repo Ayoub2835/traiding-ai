@@ -45,6 +45,15 @@ const CATALOGO = [
   { clave: 'YOUTUBE_CLIENT_ID', grupo: 'YouTube', etiqueta: 'ID de cliente de Google (OAuth)', ayuda: 'console.cloud.google.com → activa "YouTube Data API v3" → Pantalla de consentimiento (publícala, o el permiso caduca a los 7 días) → Credenciales → ID de cliente OAuth tipo "App de escritorio".' },
   { clave: 'YOUTUBE_CLIENT_SECRET', grupo: 'YouTube', etiqueta: 'Secreto de cliente de Google', secreta: true },
   { clave: 'YOUTUBE_REFRESH_TOKEN', grupo: 'YouTube', etiqueta: 'Permiso del canal (se rellena al pulsar «Conectar YouTube»)', secreta: true, ayuda: 'No lo escribas a mano: pestaña Rutinas → Subir vídeo a YouTube → Conectar YouTube.' },
+  { clave: 'META_APP_ID', grupo: 'Redes sociales', etiqueta: 'Meta: ID de la app', ayuda: 'developers.facebook.com → Mis apps → Crear app (tipo Empresa) → añade "Inicio de sesión con Facebook para empresas" e "Instagram". Necesitas una Página de Facebook y una cuenta de Instagram profesional vinculada a ella.' },
+  { clave: 'META_APP_SECRET', grupo: 'Redes sociales', etiqueta: 'Meta: clave secreta de la app', secreta: true },
+  { clave: 'META_USER_TOKEN', grupo: 'Redes sociales', etiqueta: 'Meta: token de usuario (temporal)', secreta: true, ayuda: 'Herramientas → Explorador de la Graph API → elige tu app → permisos pages_show_list, pages_read_engagement, pages_manage_posts, instagram_basic, instagram_content_publish, business_management → Generar token. Pégalo y pulsa «Conectar Facebook e Instagram» (se borra solo).' },
+  { clave: 'META_PAGINA', grupo: 'Redes sociales', etiqueta: 'Meta: nombre de tu Página (si tienes varias)' },
+  { clave: 'META_PAGE_TOKEN', grupo: 'Redes sociales', etiqueta: 'Meta: permiso de la Página (automático)', secreta: true },
+  { clave: 'TIKTOK_CLIENT_KEY', grupo: 'Redes sociales', etiqueta: 'TikTok: Client key', ayuda: 'developers.tiktok.com → Manage apps → crea una app con "Login Kit" (Desktop) y "Content Posting API" (Direct Post). Redirect URI: http://127.0.0.1:*/callback/' },
+  { clave: 'TIKTOK_CLIENT_SECRET', grupo: 'Redes sociales', etiqueta: 'TikTok: Client secret', secreta: true },
+  { clave: 'TIKTOK_REFRESH_TOKEN', grupo: 'Redes sociales', etiqueta: 'TikTok: permiso de la cuenta (automático)', secreta: true },
+  { clave: 'TIKTOK_PRIVACIDAD', grupo: 'Redes sociales', etiqueta: 'TikTok: visibilidad (PUBLIC_TO_EVERYONE / SELF_ONLY)', defecto: 'PUBLIC_TO_EVERYONE', ayuda: 'Hasta que TikTok audite tu app, sus vídeos quedan en privado aunque pongas público.' },
   { clave: 'YOUTUBE_CREAR', grupo: 'YouTube', etiqueta: 'Crear el vídeo solo si la cola está vacía (si/no)', defecto: 'si', ayuda: 'Jarvis crea gratis un resumen cripto narrado (precios reales, noticias y voz) y lo sube.' },
   { clave: 'YOUTUBE_CANAL_NOMBRE', grupo: 'YouTube', etiqueta: 'Nombre del canal (sale en los vídeos)', defecto: 'Cripto al día' },
   { clave: 'FFMPEG_RUTA', grupo: 'Avanzado', etiqueta: 'Ruta de ffmpeg (opcional)', ayuda: 'Normalmente no hace falta: Jarvis trae su propio ffmpeg.' },
@@ -171,6 +180,12 @@ const PRUEBAS = {
 };
 PRUEBAS.YOUTUBE_REFRESH_TOKEN = async () => {
   try { return await require('../youtube').probarConexion(); } catch (e) { return e.message; }
+};
+PRUEBAS.META_PAGE_TOKEN = async () => {
+  try { return await require('../redes/meta').probar(); } catch (e) { return e.message; }
+};
+PRUEBAS.TIKTOK_REFRESH_TOKEN = async () => {
+  try { return await require('../redes/tiktok').probar(); } catch (e) { return e.message; }
 };
 PRUEBAS.OLLAMA_MODELO = PRUEBAS.OLLAMA_URL;
 PRUEBAS.GEMINI_MODELO = PRUEBAS.GEMINI_API_KEY;

@@ -19,7 +19,7 @@ const FIJAS = [
   { id: 'informe', nombre: 'Informe diario', activo: true, horario: { tipo: 'diario', hora: '12:00' }, aviso: 'movil', ultima: null, windows: false },
   { id: 'caza', nombre: 'Caza de oportunidades', activo: true, horario: { tipo: 'horas', horas: ['09:00', '13:00', '17:00', '21:00'] }, aviso: 'movil', ultima: null, windows: false },
   // Sube el siguiente vídeo de la cola (src/youtube). Apagada hasta que la actives.
-  { id: 'youtube', nombre: 'Subir vídeo a YouTube', activo: false, horario: { tipo: 'diario', hora: '18:00' }, aviso: 'notificacion', ultima: null, windows: false },
+  { id: 'youtube', nombre: 'Vídeo del día (YouTube, TikTok, Instagram, Facebook)', activo: false, horario: { tipo: 'diario', hora: '18:00' }, aviso: 'notificacion', ultima: null, windows: false },
 ];
 
 function porDefecto() {
@@ -34,7 +34,8 @@ function leer() {
   let d;
   try { d = { ...porDefecto(), ...JSON.parse(fs.readFileSync(archivo(), 'utf8')) }; } catch (_) { d = porDefecto(); }
   // Quien ya tenía rutinas.json recibe también las fijas nuevas.
-  d.fijas = FIJAS.map((f) => ({ ...f, ...((d.fijas || []).find((x) => x.id === f.id) || {}) }));
+  // El nombre de las fijas sale siempre del código (así se ven los nombres nuevos).
+  d.fijas = FIJAS.map((f) => ({ ...f, ...((d.fijas || []).find((x) => x.id === f.id) || {}), nombre: f.nombre }));
   return d;
 }
 function escribir(d) { fs.writeFileSync(archivo(), JSON.stringify(d, null, 2)); return d; }

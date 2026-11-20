@@ -15,7 +15,6 @@
 const fs = require('fs');
 const path = require('path');
 const http = require('http');
-const https = require('https');
 const crypto = require('crypto');
 const rutas = require('../nucleo/rutas');
 const claves = require('../nucleo/claves');
@@ -107,39 +106,8 @@ async function metadatos(video, pensar) {
   };
 }
 
-// ---------------------------------------------------------------------------
-// HTTP (módulos http/https de Node: permiten subir el vídeo sin cargarlo entero
-// en memoria)
-// ---------------------------------------------------------------------------
-function peticion(url, { metodo = 'GET', cabeceras = {}, cuerpo = null, archivo = null, segundos = 60 } = {}) {
-  return new Promise((resolver) => {
-    const u = new URL(url);
-    const mod = u.protocol === 'http:' ? http : https;
-    const req = mod.request(u, { method: metodo, headers: cabeceras }, (res) => {
-      let texto = '';
-      res.setEncoding('utf8');
-      res.on('data', (d) => { texto += d; });
-      res.on('end', () => {
-        let datos = null;
-        try { datos = texto ? JSON.parse(texto) : null; } catch (_) { /* no es JSON */ }
-        const ok = res.statusCode >= 200 && res.statusCode < 300;
-        const motivo = datos && (datos.error_description || datos.error?.message || (typeof datos.error === 'string' ? datos.error : null));
-        resolver({ ok, estado: res.statusCode, datos, cabeceras: res.headers, error: ok ? null : `HTTP ${res.statusCode}: ${motivo || texto.slice(0, 200)}` });
-      });
-    });
-    req.setTimeout(segundos * 1000, () => req.destroy(new Error(`sin respuesta en ${segundos} s`)));
-    req.on('error', (e) => resolver({ ok: false, sinConexion: true, error: `No se pudo conectar con Google: ${e.message}` }));
-    if (archivo) {
-      const s = fs.createReadStream(archivo);
-      s.on('error', (e) => req.destroy(e));
-      s.pipe(req);
-    } else {
-      req.end(cuerpo);
-    }
-  });
-}
-
-const formulario = (o) => new URLSearchParams(o).toString();
+// HTTP con subida de archivos por streaming (común a todas las redes).
+const { peticion, formulario } = require('../nucleo/peticion');
 
 // ---------------------------------------------------------------------------
 // OAuth
@@ -271,11 +239,13 @@ function historial() {
 const estaConectado = () => Boolean(claves.obtener('YOUTUBE_REFRESH_TOKEN'));
 
 /**
- * Ejecuta la rutina: sube el siguiente vídeo de la cola.
- * Devuelve { ok, novedad, resumen, url? } como los monitores.
+ * Ejecuta la rutina: publica el siguiente vídeo de la cola en YouTube y en las
+ * demás redes conectadas (TikTok, Instagram, Facebook; ver src/redes).
+ * Devuelve { ok, novedad, resumen, url?, redes? } como los monitores.
  */
-async function ejecutar({ pensar, crear } = {}) {
-  if (!estaConectado()) return { ok: false, error: 'YouTube no está conectado: pulsa «Conectar YouTube» en la pestaña Rutinas' };
+async function ejecutar({ pensar, crear, redes = require('../redes') } = {}) {
+  const otras = redes.activas();
+  if (!estaConectado() && !otras.length) return { ok: false, error: 'No hay ninguna red conectada: conecta YouTube, TikTok o Facebook/Instagram en la pestaña Rutinas' };
   let lista = cola();
   // Cola vacía: si está activado (por defecto sí), Jarvis crea el vídeo del día.
   if (!lista.length && crear && claves.obtener('YOUTUBE_CREAR') !== 'no') {
@@ -287,22 +257,38 @@ async function ejecutar({ pensar, crear } = {}) {
     return { ok: true, novedad: true, resumen: `No hay vídeos en la cola de YouTube. Añade alguno en ${carpeta('pendientes')}` };
   }
   const video = lista[0];
-  try {
-    const m = await metadatos(video, pensar);
-    const r = await subirVideo(video, m);
-    moverASubidos(video);
-    const h = historial();
-    h.push({ fecha: new Date().toISOString(), archivo: path.basename(video), titulo: m.titulo, id: r.id, url: r.url, privacidad: r.estado, metadatos: m.origen });
-    fs.writeFileSync(historialRuta(), JSON.stringify(h.slice(-500), null, 2));
-    registro.anotar({ origen: 'youtube', accion: `subir vídeo «${m.titulo}»`, decision: 'hecho', detalle: r.url });
-    const quedan = lista.length - 1;
-    const aviso = r.estado === 'private' && m.privacidad !== 'private'
-      ? ' Ojo: YouTube lo ha dejado PRIVADO (tu proyecto de Google aún no ha pasado la auditoría de la API).' : '';
-    return { ok: true, novedad: true, url: r.url, resumen: `Subido «${m.titulo}» (${r.estado}): ${r.url}. Quedan ${quedan} en la cola.${aviso}` };
-  } catch (e) {
-    registro.anotar({ origen: 'youtube', accion: `subir ${path.basename(video)}`, decision: 'fallo', motivo: e.message });
-    return { ok: false, error: e.message };
+  let m;
+  try { m = await metadatos(video, pensar); } catch (e) { return { ok: false, error: e.message }; }
+
+  // 1. YouTube (vídeo horizontal tal cual).
+  const partes = [];
+  let yt = null;
+  if (estaConectado()) {
+    try {
+      yt = await subirVideo(video, m);
+      registro.anotar({ origen: 'youtube', accion: `subir vídeo «${m.titulo}»`, decision: 'hecho', detalle: yt.url });
+      const aviso = yt.estado === 'private' && m.privacidad !== 'private' ? ' — quedó PRIVADO: tu proyecto de Google aún no ha pasado la auditoría de la API' : '';
+      partes.push(`YouTube ✔ ${yt.url} (${yt.estado})${aviso}`);
+    } catch (e) {
+      registro.anotar({ origen: 'youtube', accion: `subir ${path.basename(video)}`, decision: 'fallo', motivo: e.message });
+      partes.push(`YouTube ✘ ${e.message}`);
+    }
   }
+  // 2. TikTok, Instagram y Facebook (versión vertical).
+  const res = otras.length ? await redes.publicar(video, m, { redes: otras }) : {};
+  if (otras.length) partes.push(redes.resumen(res));
+
+  const algunaOk = Boolean(yt) || Object.values(res).some((r) => r.ok);
+  if (!algunaOk) return { ok: false, error: `No se publicó en ninguna red (el vídeo sigue en la cola): ${partes.join(' · ')}` };
+  moverASubidos(video);
+  const h = historial();
+  h.push({
+    fecha: new Date().toISOString(), archivo: path.basename(video), titulo: m.titulo, metadatos: m.origen,
+    id: yt?.id || null, url: yt?.url || null, privacidad: yt?.estado || null, redes: res,
+  });
+  fs.writeFileSync(historialRuta(), JSON.stringify(h.slice(-500), null, 2));
+  const quedan = lista.length - 1;
+  return { ok: true, novedad: true, url: yt?.url || Object.values(res).find((r) => r.url)?.url || null, redes: res, resumen: `Publicado «${m.titulo}»: ${partes.join(' · ')}. Quedan ${quedan} en la cola.` };
 }
 
 function estado() {

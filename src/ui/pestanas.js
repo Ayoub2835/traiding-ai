@@ -159,6 +159,31 @@ function pintarYoutube(c, r, botones) {
     ui.añadirMensaje('sistema', `YouTube conectado${res.canal ? ` (canal ${res.canal})` : ''}. Pon vídeos en la carpeta y activa la rutina.`);
     pintarRutinas();
   }));
+  // Otras redes: TikTok, Instagram y Facebook.
+  const redes = el('div', 'meta', 'Comprobando TikTok, Instagram y Facebook…');
+  c.insertBefore(redes, fila);
+  api.llamar('redes.estado').then((s) => {
+    if (!s || s.ok === false) { redes.textContent = (s && s.error) || 'No se pudo leer el estado de las redes'; return; }
+    const m = (ok, nombre, extra) => `${ok ? '✔' : '✘'} ${nombre}${ok && extra ? ` (${extra})` : ''}`;
+    redes.textContent = [m(s.tiktok, 'TikTok', s.usuario && `@${s.usuario}`), m(s.instagram, 'Instagram'), m(s.facebook, 'Facebook', s.pagina)].join(' · ');
+  });
+  botones.append(boton('Conectar TikTok', async (ev) => {
+    ev.target.disabled = true;
+    ui.añadirMensaje('sistema', 'Abriendo el navegador: entra en TikTok y da permiso a Jarvis para publicar vídeos.');
+    const res = await api.llamar('redes.conectarTikTok');
+    ev.target.disabled = false;
+    if (!res.ok) return ui.mostrarError(res.error);
+    ui.añadirMensaje('sistema', `TikTok conectado${res.usuario ? ` (@${res.usuario})` : ''}.`);
+    pintarRutinas();
+  }));
+  botones.append(boton('Conectar Facebook e Instagram', async (ev) => {
+    ev.target.disabled = true;
+    const res = await api.llamar('redes.conectarMeta');
+    ev.target.disabled = false;
+    if (!res.ok) return ui.mostrarError(res.error);
+    ui.añadirMensaje('sistema', `Facebook conectado (Página ${res.pagina})${res.instagram ? ` e Instagram (@${res.instagram})` : '. Ojo: tu Página no tiene una cuenta de Instagram profesional vinculada'}.`);
+    pintarRutinas();
+  }));
   botones.append(boton('🎬 Crear vídeo ahora', async (ev) => {
     ev.target.disabled = true;
     ui.añadirMensaje('sistema', 'Creando el vídeo de hoy (datos, guion, voz y montaje). Puede tardar unos minutos…');

@@ -92,7 +92,7 @@ test('ejecutar: sin conectar avisa; con cola vacía avisa de que la llenes', asy
   claves.guardar({ YOUTUBE_REFRESH_TOKEN: '' });
   const r1 = await youtube.ejecutar();
   assert.strictEqual(r1.ok, false);
-  assert.match(r1.error, /no está conectado/);
+  assert.match(r1.error, /ninguna red conectada/);
   claves.guardar({ YOUTUBE_CLIENT_ID: 'cid', YOUTUBE_CLIENT_SECRET: 'sec', YOUTUBE_REFRESH_TOKEN: 'ref-1' });
   const r2 = await youtube.ejecutar();
   assert.ok(r2.ok && r2.novedad);
@@ -187,7 +187,7 @@ test('programador: la rutina de YouTube existe, empieza apagada y no se puede qu
   assert.ok(y);
   assert.strictEqual(y.activo, false);
   const g = programador.guardar({ ...y, activo: true, horario: { tipo: 'diario', hora: '20:15' } });
-  assert.deepStrictEqual([g.nombre, g.activo, g.horario.hora], ['Subir vídeo a YouTube', true, '20:15']);
+  assert.deepStrictEqual([g.nombre, g.activo, g.horario.hora], ['Vídeo del día (YouTube, TikTok, Instagram, Facebook)', true, '20:15']);
   assert.strictEqual(programador.quitar('youtube'), false);
   assert.strictEqual(programador.obtener('resumen').nombre, 'Resumen de la mañana');
 });

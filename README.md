@@ -120,6 +120,22 @@ Si el elegido falla, prueba el siguiente (Gemini → Ollama → Claude → n8n s
 - **Voz** gratis de Edge TTS y **montaje** con ffmpeg (incluido en Jarvis): diapositivas con zoom suave.
 - Botón **🎬 Crear vídeo ahora** para generarlo y verlo antes de que se publique. Para subir solo tus propios vídeos, pon `YOUTUBE_CREAR=no` en *Ajustes → Claves*. El nombre del canal que sale en los vídeos se cambia en `YOUTUBE_CANAL_NOMBRE`.
 
+### TikTok, Instagram y Facebook
+
+La misma rutina (*Vídeo del día*) publica también en cada red que conectes; basta con conectar una. Para estas redes Jarvis hace una **versión vertical 1080x1920** (vídeo centrado, fondo desenfocado, título arriba) de 90 s como máximo (si dura más, la acelera un poco). Si una red falla, las demás siguen; el vídeo solo sale de la cola cuando se ha publicado en alguna.
+
+**Facebook e Instagram** (necesitas una **Página de Facebook** y una cuenta de **Instagram profesional** vinculada a ella):
+1. En [developers.facebook.com](https://developers.facebook.com) → *Mis apps → Crear app* (tipo Empresa) y añade *Inicio de sesión con Facebook para empresas* e *Instagram*. Copia el **ID de la app** y la **clave secreta** (*Configuración → Básica*).
+2. *Herramientas → Explorador de la Graph API*: elige tu app, marca `pages_show_list`, `pages_read_engagement`, `pages_manage_posts`, `instagram_basic`, `instagram_content_publish` y `business_management`, y pulsa *Generate Access Token*.
+3. En Jarvis, *Ajustes → Claves → Redes sociales*: pega el ID, la clave secreta y ese token. Luego *Rutinas → Conectar Facebook e Instagram*: Jarvis guarda el permiso de tu Página, que **no caduca**, y borra el token temporal.
+
+**TikTok**:
+1. En [developers.tiktok.com](https://developers.tiktok.com) → *Manage apps*: crea una app con **Login Kit** (plataforma *Desktop*) y **Content Posting API** (activa *Direct Post*). En Login Kit añade la redirect URI `http://127.0.0.1:*/callback/`.
+2. Pega el **Client key** y el **Client secret** en *Ajustes → Claves → Redes sociales* y pulsa *Rutinas → Conectar TikTok*.
+3. **Importante:** hasta que TikTok **audite tu app** (se pide desde su web de desarrolladores), todo lo que publique queda en **privado** («solo yo»). Es una norma de TikTok; Jarvis te lo indica en el resultado.
+
+Los vídeos de TikTok se marcan como contenido generado con IA (voz sintética), como piden sus normas.
+
 Los vídeos subidos pasan a `youtube\subidos` y quedan en `youtube\historial.json`; si una subida falla, el vídeo se queda en la cola y se reintenta al día siguiente. **Importante:** hasta que Google apruebe la auditoría de tu proyecto (formulario «YouTube API Services – Audit and Quota Extension»), YouTube deja **privados** los vídeos subidos por API; Jarvis te avisa si pasa. Y YouTube penaliza el contenido repetitivo o generado en masa: sube vídeos con valor propio.
 
 ## Desarrollo

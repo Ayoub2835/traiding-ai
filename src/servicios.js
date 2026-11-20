@@ -30,6 +30,9 @@ const negocio = require('./rutinas/negocio');
 const busqueda = require('./rutinas/busqueda');
 const youtube = require('./youtube');
 const creadorVideos = require('./youtube/creador');
+const redesSociales = require('./redes');
+const redesMeta = require('./redes/meta');
+const redesTikTok = require('./redes/tiktok');
 const path = require('path');
 
 let ctx = null;        // { cfg(), ventana(), mostrar(), panel(), icono }
@@ -281,6 +284,10 @@ const ACCIONES = {
   // YouTube
   'youtube.estado': () => youtube.estado(),
   'youtube.conectar': () => youtube.conectar((url) => shell.openExternal(url)),
+  // TikTok, Instagram y Facebook
+  'redes.estado': () => redesSociales.estado(),
+  'redes.conectarMeta': () => redesMeta.conectar(),
+  'redes.conectarTikTok': () => redesTikTok.conectar((url) => shell.openExternal(url)),
   // Crea el vídeo de hoy y lo deja en la cola (sin subirlo) para que lo veas antes.
   'youtube.crearAhora': async () => {
     const r = await creadorVideos.crear({ pensar: cerebro.pensar });
