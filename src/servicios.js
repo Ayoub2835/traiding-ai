@@ -324,7 +324,11 @@ const ACCIONES = {
   'revision.publicar': (nombre, destinos) => revision.publicar(nombre, Array.isArray(destinos) ? destinos.map(String) : []),
   'revision.descartar': (nombre) => revision.descartar(nombre),
   'revision.ver': async (nombre) => { const e = await shell.openPath(revision.ruta(nombre)); return e ? { ok: false, error: e } : { ok: true }; },
-  'youtube.abrirCarpeta': async () => { const e = await shell.openPath(youtube.carpeta('pendientes')); return e ? { ok: false, error: e } : { ok: true }; },
+  'youtube.abrirCarpeta': async (cual) => {
+    const nombre = ['pendientes', 'revisar', 'subidos'].includes(cual) ? cual : 'pendientes';
+    const e = await shell.openPath(youtube.carpeta(nombre));
+    return e ? { ok: false, error: e } : { ok: true };
+  },
   // Memoria
   'memoria.hechos': () => memoria.leerHechos().slice().reverse(),
   'memoria.estado': (id, estadoNuevo) => { const ok = memoria.cambiarEstado(id, String(estadoNuevo).slice(0, 30)); ctx.refrescarPanel(); return ok; },

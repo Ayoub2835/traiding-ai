@@ -201,8 +201,11 @@ async function pintarCuentas() {
     fila('TikTok', s.tiktok, s.usuario ? `@${s.usuario}` : 'faltan Client key/secret (Ajustes → Claves → Redes sociales)',
       boton(s.tiktok ? 'Reconectar' : 'Conectar', () => conectar('redes.conectarTikTok', 'Abriendo el navegador: entra en TikTok y da permiso a Jarvis.', (r) => `TikTok conectado${r.usuario ? ` (@${r.usuario})` : ''}.`), 'mini')),
     fila('Facebook', s.facebook, s.pagina || 'faltan los datos de Meta (Ajustes → Claves → Redes sociales)', conMeta),
-    fila('Instagram', s.instagram, s.instagram ? 'vinculado a tu Página' : 'se conecta junto con Facebook (botón de arriba)'),
-    fila('Snapchat', false, 'Snapchat no deja publicar automáticamente a particulares: los reels quedan en la carpeta para subirlos desde el móvil'),
+    fila('Instagram', s.instagram, s.instagram ? 'vinculado a tu Página' : 'necesita una cuenta profesional vinculada a tu Página de Facebook (se conecta junto con Facebook)',
+      boton(s.instagram ? 'Reconectar' : 'Conectar', () => conectar('redes.conectarMeta', null,
+        (r) => (r.instagram ? `Instagram conectado (@${r.instagram}) junto con Facebook (Página ${r.pagina}).` : `Facebook conectado (Página ${r.pagina}), pero no hay ninguna cuenta de Instagram profesional vinculada a esa Página: vincúlala en la app de Instagram (Configuración → Cuenta → Compartir en otras apps / Centro de cuentas) y vuelve a pulsar Conectar.`)), 'mini')),
+    fila('Snapchat', false, 'Snapchat no deja publicar automáticamente a particulares: abre la carpeta y súbelos desde el móvil',
+      boton('Abrir carpeta', async () => { const r = await api.llamar('youtube.abrirCarpeta', 'revisar'); if (!r.ok) ui.mostrarError(r.error); }, 'mini')),
   );
 }
 
