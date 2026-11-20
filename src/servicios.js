@@ -33,6 +33,7 @@ const creadorVideos = require('./youtube/creador');
 const redesSociales = require('./redes');
 const redesMeta = require('./redes/meta');
 const redesTikTok = require('./redes/tiktok');
+const recortes = require('./redes/recortes');
 const path = require('path');
 
 let ctx = null;        // { cfg(), ventana(), mostrar(), panel(), icono }
@@ -288,6 +289,28 @@ const ACCIONES = {
   'redes.estado': () => redesSociales.estado(),
   'redes.conectarMeta': () => redesMeta.conectar(),
   'redes.conectarTikTok': () => redesTikTok.conectar((url) => shell.openExternal(url)),
+  // Reels de un vídeo TUYO: eliges el archivo, confirmas que tienes los derechos
+  // y decides si solo crearlos (para revisarlos) o crearlos y publicarlos.
+  'reels.desdeArchivo': async () => {
+    const elegido = await dialog.showOpenDialog(ctx.ventana(), {
+      title: 'Elige un vídeo tuyo para hacer reels', properties: ['openFile'],
+      filters: [{ name: 'Vídeos', extensions: ['mp4', 'mov', 'm4v', 'mkv', 'webm', 'avi'] }],
+    });
+    if (elegido.canceled || !elegido.filePaths[0]) return { ok: false, error: 'Cancelado' };
+    const archivo = elegido.filePaths[0];
+    const { response, checkboxChecked } = await dialog.showMessageBox(ctx.ventana(), {
+      type: 'question', title: 'Jarvis', buttons: ['Solo crear (para revisarlos)', 'Crear y publicar', 'Cancelar'], defaultId: 0, cancelId: 2,
+      message: `¿Hago 3 reels de 45 s con los mejores momentos de «${path.basename(archivo)}»?`,
+      detail: 'Solo vídeos tuyos o con permiso: subir películas o vídeos de otros infringe los derechos de autor y las redes borran los vídeos y pueden cerrar tus cuentas.',
+      checkboxLabel: 'Confirmo que tengo los derechos de este vídeo', checkboxChecked: false,
+    });
+    if (response === 2) return { ok: false, error: 'Cancelado' };
+    if (!checkboxChecked) return { ok: false, error: 'Para hacer reels tienes que confirmar que tienes los derechos del vídeo' };
+    registro.anotar({ origen: 'reels', accion: `reels de ${path.basename(archivo)}`, decision: response === 1 ? 'crear y publicar' : 'solo crear', motivo: 'derechos confirmados por el usuario' });
+    const r = await recortes.crear({ archivo, publicar: response === 1 });
+    if (r.ok) shell.openPath(r.carpeta);
+    return r;
+  },
   // Crea el vídeo de hoy y lo deja en la cola (sin subirlo) para que lo veas antes.
   'youtube.crearAhora': async () => {
     const r = await creadorVideos.crear({ pensar: cerebro.pensar });

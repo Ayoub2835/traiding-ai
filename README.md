@@ -136,6 +136,10 @@ La misma rutina (*Vídeo del día*) publica también en cada red que conectes; b
 
 Los vídeos de TikTok se marcan como contenido generado con IA (voz sintética), como piden sus normas.
 
+### Reels de un vídeo tuyo
+
+*Rutinas → ✂️ Reels de un vídeo mío*: eliges un vídeo de tu PC, confirmas que **tienes sus derechos** y Jarvis busca los 3 momentos con más energía (por el audio), hace 3 reels verticales de 45 s y, si eliges *Crear y publicar*, los sube a YouTube (como Shorts), TikTok, Instagram y Facebook. Con *Solo crear* te los deja en una carpeta para revisarlos. Jarvis **no descarga** vídeos de YouTube ni de otras webs: subir películas o vídeos de otros infringe los derechos de autor y las redes borran esos vídeos y pueden cerrar la cuenta.
+
 Los vídeos subidos pasan a `youtube\subidos` y quedan en `youtube\historial.json`; si una subida falla, el vídeo se queda en la cola y se reintenta al día siguiente. **Importante:** hasta que Google apruebe la auditoría de tu proyecto (formulario «YouTube API Services – Audit and Quota Extension»), YouTube deja **privados** los vídeos subidos por API; Jarvis te avisa si pasa. Y YouTube penaliza el contenido repetitivo o generado en masa: sube vídeos con valor propio.
 
 ## Desarrollo

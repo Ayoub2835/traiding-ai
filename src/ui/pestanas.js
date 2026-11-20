@@ -184,6 +184,13 @@ function pintarYoutube(c, r, botones) {
     ui.añadirMensaje('sistema', `Facebook conectado (Página ${res.pagina})${res.instagram ? ` e Instagram (@${res.instagram})` : '. Ojo: tu Página no tiene una cuenta de Instagram profesional vinculada'}.`);
     pintarRutinas();
   }));
+  botones.append(boton('✂️ Reels de un vídeo mío', async (ev) => {
+    ev.target.disabled = true;
+    const res = await api.llamar('reels.desdeArchivo');
+    ev.target.disabled = false;
+    if (!res.ok) { if (res.error !== 'Cancelado') ui.mostrarError(res.error); return; }
+    ui.añadirMensaje('sistema', `Reels listos (te abro la carpeta):\n${res.resumen}`);
+  }));
   botones.append(boton('🎬 Crear vídeo ahora', async (ev) => {
     ev.target.disabled = true;
     ui.añadirMensaje('sistema', 'Creando el vídeo de hoy (datos, guion, voz y montaje). Puede tardar unos minutos…');
