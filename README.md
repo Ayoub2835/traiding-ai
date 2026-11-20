@@ -120,6 +120,12 @@ Si el elegido falla, prueba el siguiente (Gemini → Ollama → Claude → n8n s
 - **Voz** gratis de Edge TTS y **montaje** con ffmpeg (incluido en Jarvis): diapositivas con zoom suave.
 - Botón **🎬 Crear vídeo ahora** para generarlo y verlo antes de que se publique. Para subir solo tus propios vídeos, pon `YOUTUBE_CREAR=no` en *Ajustes → Claves*. El nombre del canal que sale en los vídeos se cambia en `YOUTUBE_CANAL_NOMBRE`.
 
+### Pestaña REDES (cuentas, crear vídeos y revisar antes de publicar)
+
+- **Cuentas**: estado de YouTube, TikTok, Facebook, Instagram y Snapchat, con su botón *Conectar*. (Snapchat no permite a particulares publicar automáticamente: sube esos vídeos desde el móvil.)
+- **Crear vídeo**: escribe de qué lo quieres (tu *prompt*, p. ej. «5 errores de los novatos en trading») y pulsa *🎬 Generar vídeo*; o *📈 Resumen cripto de hoy*; o *✂️ Reels de un vídeo mío*.
+- **Por revisar**: **nada se publica sin tu permiso**. Cada vídeo nuevo (también el de la rutina diaria, salvo que pongas `YOUTUBE_REVISAR=no`) espera aquí: lo ves (*▶ Ver*), cambias título y descripción, marcas en qué redes sale y pulsas *✔ Publicar* (o *Descartar*, que lo manda a la papelera de Jarvis).
+
 ### TikTok, Instagram y Facebook
 
 La misma rutina (*Vídeo del día*) publica también en cada red que conectes; basta con conectar una. Para estas redes Jarvis hace una **versión vertical 1080x1920** (vídeo centrado, fondo desenfocado, título arriba) de 90 s como máximo (si dura más, la acelera un poco). Si una red falla, las demás siguen; el vídeo solo sale de la cola cuando se ha publicado en alguna.

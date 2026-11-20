@@ -150,56 +150,7 @@ function pintarYoutube(c, r, botones) {
     info.title = e.carpeta;
     if (e.ultimos[0]) c.insertBefore(el('div', 'detalle', `Último: «${e.ultimos[0].titulo}» · ${e.ultimos[0].url}`, { dir: 'auto' }), fila.nextSibling);
   });
-  botones.append(boton('Conectar YouTube', async (ev) => {
-    ev.target.disabled = true;
-    ui.añadirMensaje('sistema', 'Abriendo el navegador: elige tu canal y da permiso a Jarvis para subir vídeos.');
-    const res = await api.llamar('youtube.conectar');
-    ev.target.disabled = false;
-    if (!res.ok) return ui.mostrarError(`YouTube: ${res.error}`);
-    ui.añadirMensaje('sistema', `YouTube conectado${res.canal ? ` (canal ${res.canal})` : ''}. Pon vídeos en la carpeta y activa la rutina.`);
-    pintarRutinas();
-  }));
-  // Otras redes: TikTok, Instagram y Facebook.
-  const redes = el('div', 'meta', 'Comprobando TikTok, Instagram y Facebook…');
-  c.insertBefore(redes, fila);
-  api.llamar('redes.estado').then((s) => {
-    if (!s || s.ok === false) { redes.textContent = (s && s.error) || 'No se pudo leer el estado de las redes'; return; }
-    const m = (ok, nombre, extra) => `${ok ? '✔' : '✘'} ${nombre}${ok && extra ? ` (${extra})` : ''}`;
-    redes.textContent = [m(s.tiktok, 'TikTok', s.usuario && `@${s.usuario}`), m(s.instagram, 'Instagram'), m(s.facebook, 'Facebook', s.pagina)].join(' · ');
-  });
-  botones.append(boton('Conectar TikTok', async (ev) => {
-    ev.target.disabled = true;
-    ui.añadirMensaje('sistema', 'Abriendo el navegador: entra en TikTok y da permiso a Jarvis para publicar vídeos.');
-    const res = await api.llamar('redes.conectarTikTok');
-    ev.target.disabled = false;
-    if (!res.ok) return ui.mostrarError(res.error);
-    ui.añadirMensaje('sistema', `TikTok conectado${res.usuario ? ` (@${res.usuario})` : ''}.`);
-    pintarRutinas();
-  }));
-  botones.append(boton('Conectar Facebook e Instagram', async (ev) => {
-    ev.target.disabled = true;
-    const res = await api.llamar('redes.conectarMeta');
-    ev.target.disabled = false;
-    if (!res.ok) return ui.mostrarError(res.error);
-    ui.añadirMensaje('sistema', `Facebook conectado (Página ${res.pagina})${res.instagram ? ` e Instagram (@${res.instagram})` : '. Ojo: tu Página no tiene una cuenta de Instagram profesional vinculada'}.`);
-    pintarRutinas();
-  }));
-  botones.append(boton('✂️ Reels de un vídeo mío', async (ev) => {
-    ev.target.disabled = true;
-    const res = await api.llamar('reels.desdeArchivo');
-    ev.target.disabled = false;
-    if (!res.ok) { if (res.error !== 'Cancelado') ui.mostrarError(res.error); return; }
-    ui.añadirMensaje('sistema', `Reels listos (te abro la carpeta):\n${res.resumen}`);
-  }));
-  botones.append(boton('🎬 Crear vídeo ahora', async (ev) => {
-    ev.target.disabled = true;
-    ui.añadirMensaje('sistema', 'Creando el vídeo de hoy (datos, guion, voz y montaje). Puede tardar unos minutos…');
-    const res = await api.llamar('youtube.crearAhora');
-    ev.target.disabled = false;
-    if (!res.ok) return ui.mostrarError(res.error);
-    ui.añadirMensaje('sistema', `Vídeo listo: «${res.titulo}» (${res.escenas} escenas). Te abro la carpeta para que lo veas; se subirá en la próxima rutina.`);
-    pintarRutinas();
-  }));
+  c.append(el('div', 'meta', 'Cuentas, vídeos nuevos y «Por revisar»: pestaña REDES.'));
   botones.append(boton('Abrir carpeta de vídeos', async () => {
     const res = await api.llamar('youtube.abrirCarpeta');
     if (!res.ok) ui.mostrarError(res.error);
@@ -210,11 +161,125 @@ $('formMonitor').addEventListener('submit', async (e) => {
   e.preventDefault();
   const tipo = $('monTipo').value;
   const horario = tipo === 'diario' ? { tipo, hora: $('monValor').value.trim() } : { tipo, minutos: Number($('monValor').value) };
-  const r = await api.llamar('rutinas.guardar', { nombre: $('monNombre').value, instruccion: $('monInstruccion').value, horario, aviso: $('monAviso').value, activo: true, motor: 'n8n' });
+  const r = await api.llamar('rutinas.guardar', { nombre: $('monNombre').value, instruccion: $('monInstruccion').value, horario, aviso: $('monAviso').value, activo: true, motor: $('monMotor').value === 'manos' ? 'manos' : 'n8n' });
   if (r && r.ok === false) return ui.mostrarError(r.error);
   e.target.reset();
   e.target.closest('details').open = false;
+  ui.añadirMensaje('sistema', `Rutina «${r.nombre}» creada.`);
 });
+
+// ---------------------------------------------------------------------------
+// REDES: cuentas, crear vídeos y «Por revisar»
+// ---------------------------------------------------------------------------
+const NOMBRE_RED = { youtube: 'YouTube', tiktok: 'TikTok', instagram: 'Instagram', facebook: 'Facebook' };
+
+async function conectar(accion, aviso, exito) {
+  if (aviso) ui.añadirMensaje('sistema', aviso);
+  const res = await api.llamar(accion);
+  if (!res.ok) return ui.mostrarError(res.error);
+  ui.añadirMensaje('sistema', exito(res));
+  pintarRedes();
+}
+
+async function pintarCuentas() {
+  const s = await api.llamar('redes.cuentas');
+  const cont = $('redCuentas');
+  if (!s || s.ok === false) return vacio(cont, (s && s.error) || 'No se pudo leer el estado de las cuentas');
+  const fila = (nombre, ok, detalle, btn) => {
+    const c = el('div', 'tarjeta cuenta');
+    const izq = el('div');
+    izq.append(el('span', ok ? 'ok' : 'no', ok ? '✔ ' : '✘ '), el('strong', '', nombre), el('span', 'meta', detalle ? ` · ${detalle}` : ''));
+    c.append(izq);
+    if (btn) c.append(btn);
+    return c;
+  };
+  const conMeta = boton(s.facebook ? 'Reconectar' : 'Conectar', () => conectar('redes.conectarMeta', null,
+    (r) => `Facebook conectado (Página ${r.pagina})${r.instagram ? ` e Instagram (@${r.instagram})` : '. Ojo: tu Página no tiene una cuenta de Instagram profesional vinculada'}.`), 'mini');
+  cont.replaceChildren(
+    fila('YouTube', s.youtube, s.youtube ? 'canal conectado' : (s.youtubeConfigurado ? '' : 'faltan las claves de Google (Ajustes → Claves → YouTube)'),
+      boton(s.youtube ? 'Reconectar' : 'Conectar', () => conectar('youtube.conectar', 'Abriendo el navegador: elige tu canal y da permiso a Jarvis.', (r) => `YouTube conectado${r.canal ? ` (canal ${r.canal})` : ''}.`), 'mini')),
+    fila('TikTok', s.tiktok, s.usuario ? `@${s.usuario}` : 'faltan Client key/secret (Ajustes → Claves → Redes sociales)',
+      boton(s.tiktok ? 'Reconectar' : 'Conectar', () => conectar('redes.conectarTikTok', 'Abriendo el navegador: entra en TikTok y da permiso a Jarvis.', (r) => `TikTok conectado${r.usuario ? ` (@${r.usuario})` : ''}.`), 'mini')),
+    fila('Facebook', s.facebook, s.pagina || 'faltan los datos de Meta (Ajustes → Claves → Redes sociales)', conMeta),
+    fila('Instagram', s.instagram, s.instagram ? 'vinculado a tu Página' : 'se conecta junto con Facebook (botón de arriba)'),
+    fila('Snapchat', false, 'Snapchat no deja publicar automáticamente a particulares: los reels quedan en la carpeta para subirlos desde el móvil'),
+  );
+}
+
+async function pintarRevisar() {
+  const [lista, s] = await Promise.all([api.llamar('revision.lista'), api.llamar('redes.cuentas')]);
+  const cont = $('listaRevisar');
+  $('contRevisar').textContent = lista.length || 0;
+  $('contRevisar').classList.toggle('oculto', !lista.length);
+  if (!Array.isArray(lista) || !lista.length) return vacio(cont, 'No hay vídeos esperando. Crea uno arriba o espera al vídeo del día.');
+  const conectadas = ['youtube', 'tiktok', 'instagram', 'facebook'].filter((x) => s && s[x]);
+  cont.replaceChildren(...lista.map((v) => {
+    const c = el('div', 'tarjeta revisar');
+    const titulo = el('input', '', null, { type: 'text', maxlength: '100', dir: 'auto' });
+    titulo.value = v.titulo;
+    const desc = el('textarea', '', null, { rows: '3', dir: 'auto' });
+    desc.value = v.descripcion;
+    const elegir = el('div', 'redes-elegir');
+    const marcas = {};
+    for (const red of ['youtube', 'tiktok', 'instagram', 'facebook']) {
+      const lab = el('label');
+      const chk = el('input', '', null, { type: 'checkbox' });
+      chk.checked = conectadas.includes(red);
+      chk.disabled = !conectadas.includes(red);
+      marcas[red] = chk;
+      lab.append(chk, document.createTextNode(` ${NOMBRE_RED[red]}${conectadas.includes(red) ? '' : ' (sin conectar)'}`));
+      elegir.append(lab);
+    }
+    const guardar = () => api.llamar('revision.guardar', v.nombre, { titulo: titulo.value, descripcion: desc.value });
+    const botones = el('div', 'ajuste-botones');
+    botones.append(
+      boton('▶ Ver', async () => { const r = await api.llamar('revision.ver', v.nombre); if (!r.ok) ui.mostrarError(r.error); }, 'mini'),
+      boton('Guardar texto', async () => { await guardar(); ui.añadirMensaje('sistema', 'Texto guardado.'); }, 'mini'),
+      boton('✔ Publicar', async (ev) => {
+        const destinos = Object.keys(marcas).filter((k) => marcas[k].checked);
+        if (!destinos.length) return ui.mostrarError('Elige al menos una red conectada');
+        if (!window.confirm(`¿Publicar «${titulo.value}» en ${destinos.map((d) => NOMBRE_RED[d]).join(', ')}?`)) return;
+        ev.target.disabled = true;
+        await guardar();
+        ui.añadirMensaje('sistema', `Publicando «${titulo.value}»… (puede tardar unos minutos)`);
+        const r = await api.llamar('revision.publicar', v.nombre, destinos);
+        ev.target.disabled = false;
+        if (!r.ok) return ui.mostrarError(r.error);
+        ui.añadirMensaje('sistema', r.resumen);
+        pintarRevisar();
+      }),
+      boton('Descartar', async () => {
+        if (!window.confirm(`¿Descartar «${titulo.value}»? (va a la papelera de Jarvis)`)) return;
+        const r = await api.llamar('revision.descartar', v.nombre);
+        if (!r.ok) ui.mostrarError(r.error);
+        pintarRevisar();
+      }, 'peligro'),
+    );
+    c.append(el('div', 'meta', `${hora(v.creado)} · ${v.tamañoMB} MB · ${v.nombre}`), titulo, desc, elegir, botones);
+    return c;
+  }));
+}
+
+function pintarRedes() { pintarCuentas(); pintarRevisar(); }
+
+async function crearVideo(accion, args, aviso) {
+  const botones = [...document.querySelectorAll('#formVideo button')];
+  botones.forEach((b) => { b.disabled = true; });
+  if (aviso) ui.añadirMensaje('sistema', aviso);
+  const res = await api.llamar(accion, ...args);
+  botones.forEach((b) => { b.disabled = false; });
+  if (!res.ok) { if (res.error !== 'Cancelado') ui.mostrarError(res.error); return; }
+  ui.añadirMensaje('sistema', res.resumen || `Vídeo listo para revisar: «${res.titulo}». Míralo en REDES → Por revisar.`);
+  pintarRevisar();
+}
+$('formVideo').addEventListener('submit', (e) => {
+  e.preventDefault();
+  const tema = $('temaVideo').value.trim();
+  if (!tema) return ui.mostrarError('Escribe de qué quieres el vídeo');
+  crearVideo('video.crearTema', [tema], `Creando el vídeo sobre «${tema.slice(0, 80)}» (guion, voz y montaje). Puede tardar unos minutos…`).then(() => { $('temaVideo').value = ''; });
+});
+$('btnVideoCripto').addEventListener('click', () => crearVideo('video.crearCripto', [], 'Creando el resumen cripto de hoy. Puede tardar unos minutos…'));
+$('btnReels').addEventListener('click', () => crearVideo('reels.desdeArchivo', [], ''));
 
 // ---------------------------------------------------------------------------
 // Memoria local (en la pestaña Memoria)
@@ -390,6 +455,7 @@ function alEvento({ tipo, datos }) {
         ui.añadirMensaje('error', `⚠ ${datos.nombre}: ${datos.error}`);
       }
       pintarRutinas();
+      if (datos.id === 'youtube') pintarRevisar();
       break;
     default: break;
   }
@@ -410,6 +476,8 @@ window.Pestanas = {
     document.querySelector('[data-pestana="memoria"]').addEventListener('click', pintarHechos);
     document.querySelector('[data-pestana="habilidades"]').addEventListener('click', pintarHabilidades);
     document.querySelector('[data-pestana="ajustes"]').addEventListener('click', pintarServicios);
+    document.querySelector('[data-pestana="redes"]').addEventListener('click', pintarRedes);
+    pintarRevisar();
   },
   avisoTarea() { pintarTareas(); },
   pintarServicios,

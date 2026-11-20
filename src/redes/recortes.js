@@ -1,7 +1,8 @@
 // Reels a partir de un vídeo TUYO (un archivo de tu PC, del que tengas los
 // derechos): Jarvis busca los momentos con más "energía" (el audio más alto,
 // medido con el filtro ebur128 de ffmpeg), los recorta, los pone en vertical
-// y, si quieres, los publica en YouTube (Shorts), TikTok, Instagram y Facebook.
+// y los deja en «Por revisar» para que tú los publiques en YouTube (Shorts),
+// TikTok, Instagram y Facebook.
 //
 // No descarga vídeos de YouTube ni de otras webs: subir películas o vídeos de
 // otros infringe los derechos de autor y las redes bloquean esas cuentas.
@@ -65,59 +66,40 @@ function elegirMomentos(puntos, total, { n = 3, dur = 45 } = {}) {
 }
 
 /**
- * Crea los reels (y los publica si `publicar` es true).
- * @param {{archivo:string, titulo?:string, n?:number, dur?:number, publicar?:boolean, dep?:object}} o
+ * Crea los reels y los deja en «Por revisar».
+ * @param {{archivo:string, titulo?:string, n?:number, dur?:number, dep?:object}} o
  */
-async function crear({ archivo, titulo, n = 3, dur = 45, publicar = false, dep = {} }) {
+async function crear({ archivo, titulo, n = 3, dur = 45, dep = {} }) {
   const creador = require('../youtube/creador');
   const redes = require('./index');
   if (!archivo || !fs.existsSync(archivo)) return { ok: false, error: 'No encuentro el vídeo' };
   if (!VIDEOS.test(archivo)) return { ok: false, error: 'Ese archivo no parece un vídeo (mp4, mov, mkv, webm, avi)' };
   const nombre = titulo || path.basename(archivo, path.extname(archivo)).replace(/[_-]+/g, ' ').trim();
   const marca = new Date().toISOString().slice(0, 19).replace('T', '_').replace(/:/g, '');
-  const carpeta = rutas.asegurar(rutas.datos('reels', marca));
+  const trabajo = rutas.asegurar(rutas.datos('reels', 'trabajo', marca));
+  // Los reels van a «Por revisar»: tú decides si se publican y dónde.
+  const revisar = rutas.asegurar(rutas.datos('youtube', 'revisar'));
   try {
     const total = await creador.duracion(archivo);
     const inicios = elegirMomentos(await (dep.sonoridad || sonoridad)(archivo), total, { n, dur });
     const reels = [];
     for (const [i, ini] of inicios.entries()) {
       const largo = Math.min(dur, total - ini);
-      const corte = path.join(carpeta, `corte-${i + 1}.mp4`);
+      const corte = path.join(trabajo, `corte-${i + 1}.mp4`);
       await creador.ffmpeg(['-ss', ini.toFixed(2), '-i', archivo, '-t', largo.toFixed(2), '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '20', '-c:a', 'aac', '-b:a', '160k', corte]);
       const tituloReel = inicios.length > 1 ? `${nombre} (${i + 1}/${inicios.length})` : nombre;
-      const vertical = path.join(carpeta, `reel-${i + 1}.mp4`);
+      const vertical = path.join(revisar, `${marca}-reel-${i + 1}.mp4`);
       await (dep.hacerVertical || redes.hacerVertical)(corte, tituloReel, vertical);
-      fs.rmSync(corte, { force: true });
+      fs.writeFileSync(vertical.replace(/\.mp4$/, '.json'), JSON.stringify({ titulo: `${tituloReel} #Shorts`.slice(0, 100), descripcion: tituloReel, etiquetas: ['shorts', 'reels'] }, null, 2));
       reels.push({ archivo: vertical, titulo: tituloReel, inicio: ini, duracion: largo });
     }
     registro.anotar({ origen: 'reels', accion: `crear ${reels.length} reels de ${path.basename(archivo)}`, decision: 'hecho' });
-    if (!publicar) return { ok: true, carpeta, reels, resumen: `${reels.length} reels listos en ${carpeta}` };
-
-    // Publicar: YouTube como Short (el vertical tal cual) + las demás redes.
-    const youtube = require('../youtube');
-    const lineas = [];
-    for (const r of reels) {
-      const datos = { titulo: r.titulo.slice(0, 90), descripcion: `${r.titulo}\n\n#Shorts`, etiquetas: ['shorts', 'reels'], privacidad: undefined };
-      const partes = [];
-      if (youtube.estado().conectado) {
-        try {
-          const m = await youtube.metadatos(r.archivo);
-          const y = await (dep.subirYoutube || youtube.subirVideo)(r.archivo, { ...m, titulo: `${datos.titulo} #Shorts`.slice(0, 100), descripcion: datos.descripcion, etiquetas: datos.etiquetas });
-          partes.push(`YouTube ✔ ${y.url}`);
-        } catch (e) { partes.push(`YouTube ✘ ${e.message}`); }
-      }
-      const otras = redes.activas();
-      if (otras.length) {
-        // El reel ya es vertical: se publica tal cual en TikTok, Instagram y Facebook.
-        const res = await (dep.publicar || redes.publicar)(r.archivo, datos, { redes: otras, dep: { hacerVertical: async (e) => ({ archivo: e, duracion: r.duracion, acelerado: false }) } });
-        partes.push(redes.resumen(res));
-      }
-      lineas.push(`«${r.titulo}»: ${partes.join(' · ') || 'ninguna red conectada'}`);
-    }
-    return { ok: true, carpeta, reels, resumen: lineas.join('\n') };
+    return { ok: true, carpeta: revisar, reels, resumen: `${reels.length} reels listos en «Por revisar» (pestaña REDES)` };
   } catch (e) {
     registro.anotar({ origen: 'reels', accion: `crear reels de ${path.basename(archivo)}`, decision: 'fallo', motivo: e.message });
     return { ok: false, error: `No se pudieron crear los reels: ${e.message}` };
+  } finally {
+    fs.rmSync(trabajo, { recursive: true, force: true });
   }
 }
 

@@ -245,25 +245,43 @@ const estaConectado = () => Boolean(claves.obtener('YOUTUBE_REFRESH_TOKEN'));
  */
 async function ejecutar({ pensar, crear, redes = require('../redes') } = {}) {
   const otras = redes.activas();
-  if (!estaConectado() && !otras.length) return { ok: false, error: 'No hay ninguna red conectada: conecta YouTube, TikTok o Facebook/Instagram en la pestaña Rutinas' };
+  if (!estaConectado() && !otras.length) return { ok: false, error: 'No hay ninguna red conectada: conecta YouTube, TikTok o Facebook/Instagram en la pestaña Redes' };
   let lista = cola();
   // Cola vacía: si está activado (por defecto sí), Jarvis crea el vídeo del día.
   if (!lista.length && crear && claves.obtener('YOUTUBE_CREAR') !== 'no') {
-    const c = await crear();
+    // Por defecto se revisa antes de publicar: el vídeo queda en "Por revisar".
+    const revisar = claves.obtener('YOUTUBE_REVISAR') !== 'no';
+    const c = await crear(revisar ? 'revisar' : 'pendientes');
     if (!c.ok) return { ok: false, error: c.error };
+    if (revisar) return { ok: true, novedad: true, resumen: `Vídeo listo para revisar: «${c.titulo}». Míralo en la pestaña REDES → Por revisar y pulsa Publicar.` };
     lista = cola();
   }
   if (!lista.length) {
-    return { ok: true, novedad: true, resumen: `No hay vídeos en la cola de YouTube. Añade alguno en ${carpeta('pendientes')}` };
+    return { ok: true, novedad: true, resumen: `No hay vídeos en la cola. Añade alguno en ${carpeta('pendientes')} o crea uno en la pestaña REDES` };
   }
   const video = lista[0];
   let m;
   try { m = await metadatos(video, pensar); } catch (e) { return { ok: false, error: e.message }; }
+  const r = await publicarArchivo(video, m, { redes });
+  if (!r.ok) return { ...r, error: `${r.error} (el vídeo sigue en la cola)` };
+  return { ...r, resumen: `${r.resumen}. Quedan ${lista.length - 1} en la cola.` };
+}
 
-  // 1. YouTube (vídeo horizontal tal cual).
+/**
+ * Publica un archivo en YouTube y en las demás redes conectadas (o solo en
+ * `destinos`, p. ej. ['youtube','tiktok']). Si sale bien en alguna, el vídeo
+ * pasa a "subidos" y se anota en el historial.
+ */
+async function publicarArchivo(video, m, { destinos = null, redes = require('../redes') } = {}) {
+  const conectadas = redes.activas();
+  const otras = (destinos ? destinos.filter((d) => d !== 'youtube') : conectadas).filter((d) => conectadas.includes(d));
+  const conYoutube = (!destinos || destinos.includes('youtube')) && estaConectado();
+  if (!conYoutube && !otras.length) return { ok: false, error: 'Ninguna de las redes elegidas está conectada' };
+
+  // 1. YouTube (el vídeo tal cual: horizontal, o Short si es vertical).
   const partes = [];
   let yt = null;
-  if (estaConectado()) {
+  if (conYoutube) {
     try {
       yt = await subirVideo(video, m);
       registro.anotar({ origen: 'youtube', accion: `subir vídeo «${m.titulo}»`, decision: 'hecho', detalle: yt.url });
@@ -279,7 +297,7 @@ async function ejecutar({ pensar, crear, redes = require('../redes') } = {}) {
   if (otras.length) partes.push(redes.resumen(res));
 
   const algunaOk = Boolean(yt) || Object.values(res).some((r) => r.ok);
-  if (!algunaOk) return { ok: false, error: `No se publicó en ninguna red (el vídeo sigue en la cola): ${partes.join(' · ')}` };
+  if (!algunaOk) return { ok: false, error: `No se publicó en ninguna red: ${partes.join(' · ')}` };
   moverASubidos(video);
   const h = historial();
   h.push({
@@ -287,8 +305,7 @@ async function ejecutar({ pensar, crear, redes = require('../redes') } = {}) {
     id: yt?.id || null, url: yt?.url || null, privacidad: yt?.estado || null, redes: res,
   });
   fs.writeFileSync(historialRuta(), JSON.stringify(h.slice(-500), null, 2));
-  const quedan = lista.length - 1;
-  return { ok: true, novedad: true, url: yt?.url || Object.values(res).find((r) => r.url)?.url || null, redes: res, resumen: `Publicado «${m.titulo}»: ${partes.join(' · ')}. Quedan ${quedan} en la cola.` };
+  return { ok: true, novedad: true, url: yt?.url || Object.values(res).find((r) => r.url)?.url || null, redes: res, resumen: `Publicado «${m.titulo}»: ${partes.join(' · ')}` };
 }
 
 function estado() {
@@ -301,4 +318,4 @@ function estado() {
   };
 }
 
-module.exports = { cola, leerMetadatos, metadatos, limpiarEtiquetas, tituloDeNombre, conectar, probarConexion, subirVideo, ejecutar, estado, carpeta };
+module.exports = { cola, leerMetadatos, metadatos, limpiarEtiquetas, tituloDeNombre, conectar, probarConexion, subirVideo, ejecutar, publicarArchivo, estado, carpeta, compañeros, VIDEOS };

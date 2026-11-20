@@ -85,7 +85,16 @@ async function publicar(video, datos, { redes = activas(), dep = {} } = {}) {
   const trabajo = rutas.asegurar(rutas.datos('redes', 'trabajo', String(Date.now())));
   const resultados = {};
   try {
-    const v = await (dep.hacerVertical || hacerVertical)(video, datos.titulo, path.join(trabajo, 'vertical.mp4'));
+    // Si ya es vertical (p. ej. un reel), se publica tal cual.
+    let v;
+    if (dep.hacerVertical) v = await dep.hacerVertical(video, datos.titulo, path.join(trabajo, 'vertical.mp4'));
+    else {
+      const creador = require('../youtube/creador');
+      const d = await creador.dimensiones(video).catch(() => null);
+      v = d && d.alto > d.ancho
+        ? { archivo: video, duracion: await creador.duracion(video), acelerado: false }
+        : await hacerVertical(video, datos.titulo, path.join(trabajo, 'vertical.mp4'));
+    }
     const t = texto(datos);
     const pub = {
       tiktok: () => tiktok.publicar(v.archivo, t),

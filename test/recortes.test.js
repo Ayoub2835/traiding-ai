@@ -1,5 +1,5 @@
-// Reels de un vídeo propio: elección de momentos por sonoridad, recorte real
-// con ffmpeg y publicación (con redes simuladas).
+// Reels de un vídeo propio: elección de momentos por sonoridad y recorte real
+// con ffmpeg; los reels quedan en «Por revisar» (no se publican solos).
 const test = require('node:test');
 const assert = require('node:assert');
 const os = require('os');
@@ -7,7 +7,6 @@ const fs = require('fs');
 const path = require('path');
 const { spawnSync } = require('child_process');
 process.env.JARVIS_DATOS = fs.mkdtempSync(path.join(os.tmpdir(), 'jarvis-reels-'));
-const claves = require('../src/nucleo/claves');
 const recortes = require('../src/redes/recortes');
 const creador = require('../src/youtube/creador');
 
@@ -25,7 +24,7 @@ test('elegirMomentos: los tramos más fuertes, sin solaparse y en orden', () => 
   assert.deepStrictEqual(recortes.elegirMomentos(puntos, 30, { n: 3, dur: 45 }), [0], 'vídeo corto: un solo reel entero');
 });
 
-test('crear: recorta el momento más fuerte de un vídeo real y lo pone en vertical', { skip: !hayFfmpeg && 'sin ffmpeg' }, async () => {
+test('crear: recorta el momento más fuerte, lo pone en vertical y lo deja en «Por revisar»', { skip: !hayFfmpeg && 'sin ffmpeg' }, async () => {
   const video = path.join(process.env.JARVIS_DATOS, 'mi_video.mp4');
   // 30 s de vídeo; el audio es casi silencio salvo un tramo fuerte entre 15 y 20 s.
   const r0 = spawnSync(creador.rutaFfmpeg(), ['-y', '-loglevel', 'error', '-f', 'lavfi', '-i', 'testsrc=size=320x180:rate=30:duration=30',
@@ -41,29 +40,13 @@ test('crear: recorta el momento más fuerte de un vídeo real y lo pone en verti
   assert.ok(Math.abs(r.reels[0].inicio - 15) <= 1, `debía elegir ~15 s y eligió ${r.reels[0].inicio}`);
   assert.ok(Math.abs(verticales[0].dur - 5) < 0.3);
   assert.strictEqual(verticales[0].titulo, 'mi video');
-  assert.deepStrictEqual(fs.readdirSync(r.carpeta), ['reel-1.mp4'], 'borra los cortes intermedios');
-});
-
-test('crear + publicar: sube cada reel a las redes conectadas tal cual (ya es vertical)', { skip: !hayFfmpeg && 'sin ffmpeg' }, async () => {
-  claves.guardar({ YOUTUBE_REFRESH_TOKEN: '', META_PAGE_TOKEN: 'P', META_PAGE_ID: 'P1', META_IG_ID: 'IG1' });
-  const video = path.join(process.env.JARVIS_DATOS, 'charla.mp4');
-  spawnSync(creador.rutaFfmpeg(), ['-y', '-loglevel', 'error', '-f', 'lavfi', '-i', 'testsrc=size=320x180:rate=30:duration=12', '-f', 'lavfi', '-i', 'sine=duration=12', '-c:v', 'libx264', '-c:a', 'aac', '-shortest', video]);
-  const llamadas = [];
-  const r = await recortes.crear({
-    archivo: video, titulo: 'Mi charla', n: 2, dur: 4, publicar: true,
-    dep: {
-      hacerVertical: async (corte, _t, salida) => { fs.copyFileSync(corte, salida); return { archivo: salida }; },
-      publicar: async (archivo, datos, { redes, dep }) => {
-        const v = await dep.hacerVertical(archivo);
-        llamadas.push({ archivo, mismo: v.archivo === archivo, redes, titulo: datos.titulo });
-        return Object.fromEntries(redes.map((x) => [x, { ok: true, url: `https://${x}/r` }]));
-      },
-    },
-  });
-  assert.ok(r.ok, r.error);
-  assert.strictEqual(llamadas.length, 2);
-  assert.deepStrictEqual(llamadas.map((l) => [l.titulo, l.mismo, l.redes]), [['Mi charla (1/2)', true, ['instagram', 'facebook']], ['Mi charla (2/2)', true, ['instagram', 'facebook']]]);
-  assert.match(r.resumen, /«Mi charla \(1\/2\)»: Instagram ✔ https:\/\/instagram\/r · Facebook ✔/);
+  assert.strictEqual(r.carpeta, path.join(process.env.JARVIS_DATOS, 'youtube', 'revisar'));
+  const archivos = fs.readdirSync(r.carpeta).sort();
+  assert.strictEqual(archivos.length, 2);
+  assert.match(archivos[0], /-reel-1\.json$/);
+  assert.match(archivos[1], /-reel-1\.mp4$/);
+  assert.strictEqual(JSON.parse(fs.readFileSync(path.join(r.carpeta, archivos[0]), 'utf8')).titulo, 'mi video #Shorts');
+  assert.deepStrictEqual(fs.readdirSync(path.join(process.env.JARVIS_DATOS, 'reels', 'trabajo')), [], 'borra los cortes intermedios');
 });
 
 test('crear: rechaza archivos que no son vídeo', async () => {

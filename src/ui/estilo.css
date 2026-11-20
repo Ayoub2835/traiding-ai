@@ -187,8 +187,17 @@ button.mini { padding: 3px 8px !important; font-size: 11px !important; }
 .mini-form button { background: transparent; border: 1px solid var(--led); color: var(--led); border-radius: 6px; padding: 0 12px; cursor: pointer; }
 .subtitulo-panel { font-size: 11px; letter-spacing: 0.3em; color: var(--led); margin: 18px 0 10px; font-weight: 600; }
 
-.nueva-rutina { margin-top: 12px; font-size: 13px; }
-.nueva-rutina summary { cursor: pointer; color: var(--led); }
+.nueva-rutina { margin: 0 0 12px; font-size: 13px; }
+.nueva-rutina summary { cursor: pointer; color: var(--led); border: 1px solid var(--led); border-radius: 6px; padding: 8px 10px; font-weight: 600; }
+/* Pestaña REDES */
+.titulo-seccion { font-size: 12px; letter-spacing: 1px; color: var(--led); margin: 14px 0 8px; }
+#formVideo textarea, .revisar input, .revisar textarea { width: 100%; box-sizing: border-box; background: #000; color: var(--texto); border: 1px solid var(--led-suave); border-radius: 6px; padding: 7px; font: inherit; font-size: 12px; }
+#formVideo .ajuste-botones { margin-top: 8px; }
+.revisar textarea { margin-top: 6px; }
+.revisar .redes-elegir { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 8px; font-size: 12px; }
+.cuenta { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.cuenta .ok { color: #22c55e; }
+.cuenta .no { color: var(--texto-suave); }
 .nueva-rutina form { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
 .nueva-rutina input, .nueva-rutina textarea, .nueva-rutina select { background: #000; color: var(--texto); border: 1px solid var(--led-suave); border-radius: 6px; padding: 7px; font: inherit; font-size: 12px; }
 .nueva-rutina .fila { display: flex; gap: 6px; }

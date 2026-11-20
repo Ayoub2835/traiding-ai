@@ -187,7 +187,7 @@ test('programador: la rutina de YouTube existe, empieza apagada y no se puede qu
   assert.ok(y);
   assert.strictEqual(y.activo, false);
   const g = programador.guardar({ ...y, activo: true, horario: { tipo: 'diario', hora: '20:15' } });
-  assert.deepStrictEqual([g.nombre, g.activo, g.horario.hora], ['Vídeo del día (YouTube, TikTok, Instagram, Facebook)', true, '20:15']);
+  assert.deepStrictEqual([g.nombre, g.activo, g.horario.hora], ['Vídeo del día', true, '20:15']);
   assert.strictEqual(programador.quitar('youtube'), false);
   assert.strictEqual(programador.obtener('resumen').nombre, 'Resumen de la mañana');
 });
