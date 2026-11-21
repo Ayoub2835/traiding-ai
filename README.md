@@ -142,6 +142,28 @@ La misma rutina (*Vídeo del día*) publica también en cada red que conectes; b
 
 Los vídeos de TikTok se marcan como contenido generado con IA (voz sintética), como piden sus normas.
 
+### Pestaña TIENDA (dropshipping con Shopify y CJ)
+
+1. **Buscar productos** en CJ Dropshipping con coste, envío a España, precio y margen reales (tras IVA y comisiones), puntuación y una opinión honesta. Tú eliges.
+2. **Ficha en Shopify** en borrador (la publicas tú).
+3. **Anuncio**: vídeo vertical con las fotos y textos (también para subirlo a TikTok Ads).
+4. **Campaña de Meta** en pausa; solo gasta si pulsas Activar y lo confirmas.
+
+Y además, en automático:
+- **Pedidos** (cada 30 min): avisa de cada pedido pagado. *Confirmar y pagar en CJ* lo compra con tu saldo de CJ (siempre pregunta con el coste). Cuando CJ lo envía, el seguimiento se pone solo en Shopify y el cliente recibe el aviso.
+- **Ventas y anuncios** (21:30): ventas, gasto en anuncios y beneficio real de hoy y 7 días. Si la campaña gasta sin vender, propone pausarla (con `TIENDA_AUTOPAUSA=si` la pausa sola; activar, nunca).
+- **Correos de clientes** (cada hora): detecta los correos de clientes, busca su pedido y seguimiento y prepara la respuesta. Al aprobarla va a tus **Borradores de Gmail**: Jarvis nunca envía correos.
+
+Permisos de la app de Shopify: `write_products`, `read_products`, `read_orders`, `write_merchant_managed_fulfillment_orders`.
+
+### Jarvis en el móvil (Telegram)
+
+1. En Telegram, habla con **@BotFather** → `/newbot` y copia el token.
+2. Pégalo en *Ajustes → Claves → Móvil* y pulsa *Probar*: te dará un código.
+3. Escribe a tu bot `/vincular <código>`. Desde entonces **solo tu chat** puede usarlo.
+
+Puedes hablarle como a Jarvis y usar `/ventas`, `/pedidos` (comprar en CJ con doble confirmación), `/revisar` (publicar o descartar vídeos) y `/ayuda`. Los avisos de las rutinas también te llegan por Telegram.
+
 ### Reels de un vídeo tuyo
 
 *Rutinas → ✂️ Reels de un vídeo mío*: eliges un vídeo de tu PC, confirmas que **tienes sus derechos** y Jarvis busca los 3 momentos con más energía (por el audio), hace 3 reels verticales de 45 s y, si eliges *Crear y publicar*, los sube a YouTube (como Shorts), TikTok, Instagram y Facebook. Con *Solo crear* te los deja en una carpeta para revisarlos. Jarvis **no descarga** vídeos de YouTube ni de otras webs: subir películas o vídeos de otros infringe los derechos de autor y las redes borran esos vídeos y pueden cerrar la cuenta.
