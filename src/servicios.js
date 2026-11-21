@@ -41,6 +41,7 @@ const tiendaAnuncios = require('./tienda/anuncios');
 const tiendaPedidos = require('./tienda/pedidos');
 const tiendaControl = require('./tienda/control');
 const telegram = require('./movil/telegram');
+const tiendaClientes = require('./tienda/clientes');
 const miniaturas = new Map();
 const path = require('path');
 
@@ -166,6 +167,7 @@ async function ejecutarRutina(id, { desdeWindows = false } = {}) {
     ? await youtube.ejecutar({ pensar: cerebro.pensar, crear: (destino) => creadorVideos.crear({ pensar: cerebro.pensar, destino }) })
     : id === 'pedidos' ? await tiendaPedidos.rutina()
     : id === 'ventas' ? await tiendaControl.informe()
+    : id === 'clientes' ? await tiendaClientes.rutina({ pensar: cerebro.pensar })
     : await monitores.ejecutar(r, { n8nChat: (t) => (usarN8n() && r.motor === 'n8n' ? n8nChat(t) : buscarWeb(t)), manos: (t) => manosYEsperar(t, `monitor:${r.nombre}`), pensar: cerebro.pensar });
   programador.anotarEjecucion(id, res);
   if (res.ok && res.novedad) {
@@ -397,6 +399,11 @@ const ACCIONES = {
   },
   'tienda.pedidoManual': (pid) => tiendaPedidos.marcarManual(String(pid)),
   'tienda.informe': () => tiendaControl.informe(),
+  // Clientes: respuestas preparadas → Borradores de Gmail (Jarvis nunca envía).
+  'tienda.clientes': () => tiendaClientes.lista(),
+  'tienda.revisarClientes': () => tiendaClientes.rutina({ pensar: cerebro.pensar }),
+  'tienda.clienteGuardar': (uid, datos) => tiendaClientes.guardar(String(uid), datos || {}),
+  'tienda.clienteDescartar': (uid) => tiendaClientes.descartar(String(uid)),
   // Vídeos nuevos: quedan en «Por revisar».
   'video.crearTema': (tema) => creadorVideos.crearDesdeTema({ tema: String(tema || '').slice(0, 500), pensar: cerebro.pensar, destino: 'revisar' }),
   'video.crearCripto': () => creadorVideos.crear({ pensar: cerebro.pensar, destino: 'revisar' }),

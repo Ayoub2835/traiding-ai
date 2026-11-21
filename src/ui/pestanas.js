@@ -125,7 +125,7 @@ async function pintarRutinas(lista) {
     }));
     if (r.id === 'youtube') pintarYoutube(c, r, botones);
     // Las rutinas fijas no se pueden quitar (solo activar/desactivar).
-    if (!['resumen', 'informe', 'caza', 'youtube', 'pedidos', 'ventas'].includes(r.id)) botones.append(boton('Quitar', async () => { await api.llamar('rutinas.quitar', r.id); }, 'peligro'));
+    if (!['resumen', 'informe', 'caza', 'youtube', 'pedidos', 'ventas', 'clientes'].includes(r.id)) botones.append(boton('Quitar', async () => { await api.llamar('rutinas.quitar', r.id); }, 'peligro'));
     c.append(botones);
     return c;
   }));
@@ -349,8 +349,48 @@ $('btnInforme').addEventListener('click', (ev) => bloquear(ev, async () => {
   $('tdInforme').textContent = r.ok ? r.resumen : `✘ ${r.error}`;
 }));
 
+async function pintarClientes() {
+  const lista = await api.llamar('tienda.clientes');
+  const cont = $('tdClientes');
+  if (!Array.isArray(lista) || !lista.length) return vacio(cont, 'No hay correos de clientes pendientes.');
+  cont.replaceChildren(...lista.map((c) => {
+    const t = el('div', 'tarjeta revisar');
+    const asunto = el('input', '', null, { type: 'text', dir: 'auto' });
+    asunto.value = c.borrador.asunto;
+    const cuerpo = el('textarea', '', null, { rows: '6', dir: 'auto' });
+    cuerpo.value = c.borrador.cuerpo;
+    const p = c.pedido;
+    t.append(
+      el('div', 'titulo', `${c.asunto}`, { dir: 'auto' }),
+      el('div', 'meta', `${c.de} · ${hora(c.fecha)}`, { dir: 'auto' }),
+      el('div', 'detalle', c.extracto, { dir: 'auto' }),
+      el('div', 'meta', p ? `Pedido ${p.nombre} · ${p.envio}${p.seguimiento ? ` · seguimiento ${p.seguimiento}` : ''}` : 'Sin pedido encontrado con ese email'),
+      el('div', 'meta', 'Respuesta propuesta (puedes cambiarla):'), asunto, cuerpo,
+    );
+    const b = el('div', 'ajuste-botones');
+    b.append(
+      boton('✔ Guardar en Borradores de Gmail', (ev) => bloquear(ev, async () => {
+        const r = await api.llamar('tienda.clienteGuardar', c.uid, { asunto: asunto.value, cuerpo: cuerpo.value });
+        if (!r.ok) return ui.mostrarError(r.error);
+        ui.añadirMensaje('sistema', `Respuesta para ${c.de} guardada en Borradores de Gmail. Revísala y envíala desde Gmail.`);
+        pintarClientes();
+      })),
+      boton('Descartar', async () => { await api.llamar('tienda.clienteDescartar', c.uid); pintarClientes(); }, 'peligro'),
+    );
+    t.append(b);
+    return t;
+  }));
+}
+$('btnRevisarClientes').addEventListener('click', (ev) => bloquear(ev, async () => {
+  ui.añadirMensaje('sistema', 'Leyendo tus correos de clientes y preparando respuestas…');
+  const r = await api.llamar('tienda.revisarClientes');
+  if (!r.ok) ui.mostrarError(r.error); else ui.añadirMensaje('sistema', r.resumen);
+  pintarClientes();
+}));
+
 async function pintarTienda() {
   pintarPedidos();
+  pintarClientes();
   const s = await api.llamar('tienda.estado');
   if (!s || s.ok === false) return;
   // Conexiones que faltan.
