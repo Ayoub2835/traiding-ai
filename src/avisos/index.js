@@ -64,6 +64,10 @@ async function avisar({ titulo, mensaje, urgencia = 'normal', permitirLlamada = 
   if (urgencia === 'urgente' && permitirLlamada && claves.tiene('TWILIO_SID')) {
     res.llamada = await llamar(`Aviso de Jarvis. ${titulo}. ${mensaje}`);
   }
+  // También a tu bot de Telegram, si lo has vinculado.
+  if (claves.tiene('TELEGRAM_BOT_TOKEN') && claves.tiene('TELEGRAM_CHAT_ID')) {
+    res.telegram = await require('../movil/telegram').enviar(`${urgencia === 'urgente' ? '🚨' : '🔔'} ${titulo}\n${mensaje}`);
+  }
   return res;
 }
 

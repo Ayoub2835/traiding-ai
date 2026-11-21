@@ -40,6 +40,7 @@ const tiendaShopify = require('./tienda/shopify');
 const tiendaAnuncios = require('./tienda/anuncios');
 const tiendaPedidos = require('./tienda/pedidos');
 const tiendaControl = require('./tienda/control');
+const telegram = require('./movil/telegram');
 const miniaturas = new Map();
 const path = require('path');
 
@@ -426,12 +427,31 @@ const ACCIONES = {
   'memoria.borrarHecho': (id) => memoria.borrarHecho(id),
   // Claves y servicios
   'claves.listar': () => claves.paraInterfaz(),
-  'claves.guardar': (cambios) => { const r = claves.guardar(cambios); registro.anotar({ origen: 'ajustes', accion: `guardar claves: ${Object.keys(cambios || {}).join(', ')}` }); return r; },
+  'claves.guardar': (cambios) => {
+    const r = claves.guardar(cambios);
+    registro.anotar({ origen: 'ajustes', accion: `guardar claves: ${Object.keys(cambios || {}).join(', ')}` });
+    // Token nuevo de Telegram: el bot arranca sin reiniciar Jarvis.
+    if (cambios && 'TELEGRAM_BOT_TOKEN' in cambios) { telegram.parar(); setTimeout(iniciarTelegram, 1500); }
+    return r;
+  },
   'claves.probar': (clave) => claves.probar(clave),
   'servicios.estado': () => estadoServicios(),
   // Registro
   'registro.ultimas': (n) => registro.ultimas(Math.min(500, Number(n) || 100)),
 };
+
+// Bot de Telegram: solo estas acciones están disponibles desde el móvil.
+function iniciarTelegram() {
+  telegram.iniciar({
+    responder: (t) => ACCIONES['cerebro.responder'](String(t).slice(0, 4000), 'telegram'),
+    informe: () => tiendaControl.informe(),
+    pedidos: async () => tiendaPedidos.lista(),
+    confirmarPedido: (id) => tiendaPedidos.confirmar(id),
+    revision: async () => revision.lista(),
+    publicar: (nombre) => revision.publicar(nombre, [...(youtube.estado().conectado ? ['youtube'] : []), ...redesSociales.activas()]),
+    descartar: async (nombre) => revision.descartar(nombre),
+  }).catch((e) => registro.anotar({ origen: 'telegram', accion: 'iniciar bot', decision: 'fallo', motivo: e.message }));
+}
 
 function iniciar(contexto) {
   ctx = contexto;
@@ -466,6 +486,7 @@ function iniciar(contexto) {
   confirmacion.eventos.on('nueva', (p) => { ctx.mostrar(); enviar('confirmacion', p); });
   confirmacion.eventos.on('resuelta', (p) => enviar('confirmacion_resuelta', p));
   programador.iniciar((id) => ejecutarRutina(id));
+  iniciarTelegram();
   // Si Ollama no está abierto, se abre solo para que el modelo local funcione.
   // Memoria de n8n: se importa sola si importado-n8n.json está en la carpeta del
   // proyecto, en Documentos\Jarvis o en Descargas (sin duplicar).

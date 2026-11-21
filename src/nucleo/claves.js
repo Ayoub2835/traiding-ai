@@ -45,6 +45,8 @@ const CATALOGO = [
   { clave: 'YOUTUBE_CLIENT_ID', grupo: 'YouTube', etiqueta: 'ID de cliente de Google (OAuth)', ayuda: 'console.cloud.google.com → activa "YouTube Data API v3" → Pantalla de consentimiento (publícala, o el permiso caduca a los 7 días) → Credenciales → ID de cliente OAuth tipo "App de escritorio".' },
   { clave: 'YOUTUBE_CLIENT_SECRET', grupo: 'YouTube', etiqueta: 'Secreto de cliente de Google', secreta: true },
   { clave: 'YOUTUBE_REFRESH_TOKEN', grupo: 'YouTube', etiqueta: 'Permiso del canal (se rellena al pulsar «Conectar YouTube»)', secreta: true, ayuda: 'No lo escribas a mano: pestaña Rutinas → Subir vídeo a YouTube → Conectar YouTube.' },
+  { clave: 'TELEGRAM_BOT_TOKEN', grupo: 'Móvil', etiqueta: 'Telegram: token de tu bot', secreta: true, ayuda: 'En Telegram habla con @BotFather → /newbot → elige nombre → copia el token aquí. Luego pulsa Probar: te dirá el código para escribir al bot (/vincular 123456).' },
+  { clave: 'TELEGRAM_CHAT_ID', grupo: 'Móvil', etiqueta: 'Telegram: tu chat (se rellena al vincular)', ayuda: 'No lo escribas: escribe a tu bot /vincular <código>. Bórralo para desvincular.' },
   { clave: 'CJ_API_KEY', grupo: 'Tienda', etiqueta: 'CJ Dropshipping: API key', secreta: true, ayuda: 'cjdropshipping.com → inicia sesión → Mi cuenta (My CJ) → Authorization → API → Generate API Key.' },
   { clave: 'META_AD_ACCOUNT_ID', grupo: 'Tienda', etiqueta: 'Meta: ID de tu cuenta publicitaria (solo números)', ayuda: 'business.facebook.com → Configuración del negocio → Cuentas publicitarias (o el número act=… en el Administrador de anuncios). Para anuncios, al generar el token de Meta marca también ads_management y ads_read.' },
   { clave: 'TIENDA_AUTOPAUSA', grupo: 'Tienda', etiqueta: 'Pausar sola la campaña si pierde dinero (si/no)', defecto: 'no', ayuda: 'Con "si", el informe nocturno pausa la campaña de Meta cuando gasta sin vender. Pausar no gasta dinero; activar, Jarvis nunca lo hace solo.' },
@@ -186,6 +188,9 @@ const PRUEBAS = {
 };
 PRUEBAS.YOUTUBE_REFRESH_TOKEN = async () => {
   try { return await require('../youtube').probarConexion(); } catch (e) { return e.message; }
+};
+PRUEBAS.TELEGRAM_BOT_TOKEN = async () => {
+  try { return await require('../movil/telegram').probar(); } catch (e) { return e.message; }
 };
 PRUEBAS.CJ_API_KEY = async () => {
   try { return await require('../tienda/cj').probar(); } catch (e) { return e.message; }
