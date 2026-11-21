@@ -125,7 +125,7 @@ async function pintarRutinas(lista) {
     }));
     if (r.id === 'youtube') pintarYoutube(c, r, botones);
     // Las rutinas fijas no se pueden quitar (solo activar/desactivar).
-    if (!['resumen', 'informe', 'caza', 'youtube', 'pedidos'].includes(r.id)) botones.append(boton('Quitar', async () => { await api.llamar('rutinas.quitar', r.id); }, 'peligro'));
+    if (!['resumen', 'informe', 'caza', 'youtube', 'pedidos', 'ventas'].includes(r.id)) botones.append(boton('Quitar', async () => { await api.llamar('rutinas.quitar', r.id); }, 'peligro'));
     c.append(botones);
     return c;
   }));
@@ -341,6 +341,12 @@ $('btnRevisarPedidos').addEventListener('click', (ev) => bloquear(ev, async () =
   const r = await api.llamar('tienda.revisarPedidos');
   if (!r.ok) ui.mostrarError(r.error); else ui.añadirMensaje('sistema', r.resumen);
   pintarPedidos();
+}));
+
+$('btnInforme').addEventListener('click', (ev) => bloquear(ev, async () => {
+  $('tdInforme').textContent = 'Calculando…';
+  const r = await api.llamar('tienda.informe');
+  $('tdInforme').textContent = r.ok ? r.resumen : `✘ ${r.error}`;
 }));
 
 async function pintarTienda() {

@@ -21,6 +21,8 @@ const FIJAS = [
   // Sube el siguiente vídeo de la cola (src/youtube). Apagada hasta que la actives.
   // Revisa pedidos de Shopify y pone el seguimiento de CJ (no compra nada solo).
   { id: 'pedidos', nombre: 'Pedidos de la tienda', activo: true, horario: { tipo: 'cada', minutos: 30 }, aviso: 'movil', ultima: null, windows: false },
+  // Ventas, gasto en anuncios y beneficio real; propone pausar lo que pierde dinero.
+  { id: 'ventas', nombre: 'Ventas y anuncios', activo: true, horario: { tipo: 'diario', hora: '21:30' }, aviso: 'movil', ultima: null, windows: false },
   { id: 'youtube', nombre: 'Vídeo del día', activo: false, horario: { tipo: 'diario', hora: '18:00' }, aviso: 'notificacion', ultima: null, windows: false },
 ];
 
