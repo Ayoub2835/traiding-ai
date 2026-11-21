@@ -278,7 +278,7 @@ function duracion(archivo) {
   });
 }
 
-async function montarEscena(png, mp3, salida) {
+async function montarEscena(png, mp3, salida, tam = { ancho: W, alto: H }) {
   const fps = 30;
   // Duración exacta: con filtros, "-shortest" no corta el vídeo de una imagen en bucle.
   const t = ((await duracion(mp3)) + 0.6).toFixed(2);
@@ -286,7 +286,7 @@ async function montarEscena(png, mp3, salida) {
   await ffmpeg([
     '-loop', '1', '-framerate', String(fps), '-i', png, '-i', mp3,
     // Zoom suave (efecto Ken Burns) hasta 1,05 a lo largo de la escena, y silencio al final.
-    '-filter_complex', `[0:v]zoompan=z='1+0.05*on/${frames}':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=1:s=${W}x${H}:fps=${fps},format=yuv420p[v];[1:a]aresample=44100,apad[a]`,
+    '-filter_complex', `[0:v]zoompan=z='1+0.05*on/${frames}':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=1:s=${tam.ancho}x${tam.alto}:fps=${fps},format=yuv420p[v];[1:a]aresample=44100,apad[a]`,
     '-map', '[v]', '-map', '[a]', '-t', t, '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '22', '-c:a', 'aac', '-b:a', '160k', '-ac', '2', salida,
   ]);
 }
@@ -313,7 +313,7 @@ function dimensiones(archivo) {
  * `destino` de youtube ('revisar' para que lo revises antes de publicar, o
  * 'pendientes' para publicarlo directamente) junto a su .json de metadatos.
  */
-async function montar({ lista, nombre, destino = 'pendientes', meta, dep = {} }) {
+async function montar({ lista, nombre, destino = 'pendientes', meta, dep = {}, tam, carpeta }) {
   const sharp = require('sharp');
   const trabajo = rutas.asegurar(rutas.datos('youtube', 'trabajo', `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`));
   try {
@@ -324,12 +324,12 @@ async function montar({ lista, nombre, destino = 'pendientes', meta, dep = {} })
       const mp4 = path.join(trabajo, `${i}.mp4`);
       await sharp(Buffer.from(e.svg)).png().toFile(png);
       fs.writeFileSync(mp3, await (dep.voz || vozEdge)(e.texto));
-      await (dep.montarEscena || montarEscena)(png, mp3, mp4);
+      await (dep.montarEscena || montarEscena)(png, mp3, mp4, tam);
       partes.push(mp4);
     }
     const listaTxt = path.join(trabajo, 'lista.txt');
     fs.writeFileSync(listaTxt, partes.map((p) => `file '${p.replace(/\\/g, '/').replace(/'/g, "'\\''")}'`).join('\n'));
-    const dir = rutas.asegurar(rutas.datos('youtube', destino === 'revisar' ? 'revisar' : 'pendientes'));
+    const dir = carpeta ? rutas.asegurar(carpeta) : rutas.asegurar(rutas.datos('youtube', destino === 'revisar' ? 'revisar' : 'pendientes'));
     let salida = path.join(dir, `${nombre}.mp4`);
     if (fs.existsSync(salida)) salida = path.join(dir, `${nombre}-${Date.now()}.mp4`);
     await (dep.unir || ((l, s) => ffmpeg(['-f', 'concat', '-safe', '0', '-i', l, '-c', 'copy', '-movflags', '+faststart', s])))(listaTxt, salida);
@@ -426,4 +426,4 @@ async function crear({ pensar, destino = 'pendientes', dep = {} } = {}) {
   }
 }
 
-module.exports = { crear, crearDesdeTema, dimensiones, mercado, guion, guionPlantilla, escenas, montarEscena, ffmpeg, duracion, rutaFfmpeg, AVISO, canal, _svg: { svgPortada, svgPrecios, svgGrafico, svgSentimiento, svgNoticia, svgCierre } };
+module.exports = { crear, crearDesdeTema, dimensiones, montar, mercado, guion, guionPlantilla, escenas, montarEscena, ffmpeg, duracion, rutaFfmpeg, AVISO, canal, _svg: { svgPortada, svgPrecios, svgGrafico, svgSentimiento, svgNoticia, svgCierre } };

@@ -63,6 +63,7 @@
         <button data-pestana="habilidades">HABILIDADES</button>
         <button data-pestana="rutinas">RUTINAS</button>
         <button data-pestana="redes">REDES <span class="contador oculto" id="contRevisar">0</span></button>
+        <button data-pestana="tienda">TIENDA</button>
         <button data-pestana="ajustes">AJUSTES</button>
       </nav>
 
@@ -129,6 +130,18 @@
         <h3 class="titulo-seccion">Por revisar</h3>
         <p class="nota">Nada se publica sin tu permiso: revisa el vídeo, cambia el texto si quieres, elige las redes y pulsa Publicar.</p>
         <div class="lista" id="listaRevisar"></div>
+      </div>
+
+      <div class="contenido-pestana oculto" id="pestana-tienda">
+        <p class="nota">Dropshipping en España con tu tienda de Shopify y CJ Dropshipping. Tú apruebas cada paso; los anuncios se crean en pausa y no gastan nada hasta que pulses Activar.</p>
+        <div class="lista" id="tdConexiones"></div>
+        <h3 class="titulo-seccion">1 · Buscar productos</h3>
+        <form id="formTienda" autocomplete="off">
+          <input id="tdNicho" type="text" dir="auto" placeholder="Nicho (opcional): p. ej. cocina, mascotas, coche…">
+          <div class="ajuste-botones"><button type="submit">🔎 Buscar productos</button></div>
+        </form>
+        <div class="lista" id="tdPropuestas"></div>
+        <div id="tdPasos"></div>
       </div>
 
       <div class="contenido-pestana oculto" id="pestana-ajustes">

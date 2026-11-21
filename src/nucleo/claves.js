@@ -45,9 +45,13 @@ const CATALOGO = [
   { clave: 'YOUTUBE_CLIENT_ID', grupo: 'YouTube', etiqueta: 'ID de cliente de Google (OAuth)', ayuda: 'console.cloud.google.com → activa "YouTube Data API v3" → Pantalla de consentimiento (publícala, o el permiso caduca a los 7 días) → Credenciales → ID de cliente OAuth tipo "App de escritorio".' },
   { clave: 'YOUTUBE_CLIENT_SECRET', grupo: 'YouTube', etiqueta: 'Secreto de cliente de Google', secreta: true },
   { clave: 'YOUTUBE_REFRESH_TOKEN', grupo: 'YouTube', etiqueta: 'Permiso del canal (se rellena al pulsar «Conectar YouTube»)', secreta: true, ayuda: 'No lo escribas a mano: pestaña Rutinas → Subir vídeo a YouTube → Conectar YouTube.' },
+  { clave: 'CJ_API_KEY', grupo: 'Tienda', etiqueta: 'CJ Dropshipping: API key', secreta: true, ayuda: 'cjdropshipping.com → inicia sesión → Mi cuenta (My CJ) → Authorization → API → Generate API Key.' },
+  { clave: 'META_AD_ACCOUNT_ID', grupo: 'Tienda', etiqueta: 'Meta: ID de tu cuenta publicitaria (solo números)', ayuda: 'business.facebook.com → Configuración del negocio → Cuentas publicitarias (o el número act=… en el Administrador de anuncios). Para anuncios, al generar el token de Meta marca también ads_management y ads_read.' },
+  { clave: 'TIENDA_MARCA', grupo: 'Tienda', etiqueta: 'Nombre de tu marca (fabricante en Shopify)' },
+  { clave: 'META_ADS_TOKEN', grupo: 'Tienda', etiqueta: 'Meta: permiso de anuncios (automático, ~60 días)', secreta: true },
   { clave: 'META_APP_ID', grupo: 'Redes sociales', etiqueta: 'Meta: ID de la app', ayuda: 'developers.facebook.com → Mis apps → Crear app (tipo Empresa) → añade "Inicio de sesión con Facebook para empresas" e "Instagram". Necesitas una Página de Facebook y una cuenta de Instagram profesional vinculada a ella.' },
   { clave: 'META_APP_SECRET', grupo: 'Redes sociales', etiqueta: 'Meta: clave secreta de la app', secreta: true },
-  { clave: 'META_USER_TOKEN', grupo: 'Redes sociales', etiqueta: 'Meta: token de usuario (temporal)', secreta: true, ayuda: 'Herramientas → Explorador de la Graph API → elige tu app → permisos pages_show_list, pages_read_engagement, pages_manage_posts, instagram_basic, instagram_content_publish, business_management → Generar token. Pégalo y pulsa «Conectar Facebook e Instagram» (se borra solo).' },
+  { clave: 'META_USER_TOKEN', grupo: 'Redes sociales', etiqueta: 'Meta: token de usuario (temporal)', secreta: true, ayuda: 'Herramientas → Explorador de la Graph API → elige tu app → permisos pages_show_list, pages_read_engagement, pages_manage_posts, instagram_basic, instagram_content_publish, business_management (y para anuncios: ads_management, ads_read) → Generar token. Pégalo y pulsa «Conectar Facebook e Instagram» (se borra solo).' },
   { clave: 'META_PAGINA', grupo: 'Redes sociales', etiqueta: 'Meta: nombre de tu Página (si tienes varias)' },
   { clave: 'META_PAGE_TOKEN', grupo: 'Redes sociales', etiqueta: 'Meta: permiso de la Página (automático)', secreta: true },
   { clave: 'TIKTOK_CLIENT_KEY', grupo: 'Redes sociales', etiqueta: 'TikTok: Client key', ayuda: 'developers.tiktok.com → Manage apps → crea una app con "Login Kit" (Desktop) y "Content Posting API" (Direct Post). Redirect URI: http://127.0.0.1:*/callback/' },
@@ -181,6 +185,9 @@ const PRUEBAS = {
 };
 PRUEBAS.YOUTUBE_REFRESH_TOKEN = async () => {
   try { return await require('../youtube').probarConexion(); } catch (e) { return e.message; }
+};
+PRUEBAS.CJ_API_KEY = async () => {
+  try { return await require('../tienda/cj').probar(); } catch (e) { return e.message; }
 };
 PRUEBAS.META_PAGE_TOKEN = async () => {
   try { return await require('../redes/meta').probar(); } catch (e) { return e.message; }

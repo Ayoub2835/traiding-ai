@@ -285,6 +285,131 @@ $('btnVideoCripto').addEventListener('click', () => crearVideo('video.crearCript
 $('btnReels').addEventListener('click', () => crearVideo('reels.desdeArchivo', [], ''));
 
 // ---------------------------------------------------------------------------
+// TIENDA: dropshipping paso a paso (tú apruebas cada paso)
+// ---------------------------------------------------------------------------
+const eur = (x) => `${Number(x).toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`;
+const bloquear = async (ev, fn) => { const b = ev && ev.target; if (b) b.disabled = true; try { return await fn(); } finally { if (b) b.disabled = false; } };
+
+function tarjetaProducto(p, { elegido = false } = {}) {
+  const c = el('div', `tarjeta td-producto${elegido ? ' td-elegido' : ''}`);
+  const img = el('img', '', null, { alt: '' });
+  api.llamar('tienda.miniatura', p.pid).then((u) => { if (u) img.src = u; });
+  const info = el('div');
+  info.append(
+    el('div', 'titulo', p.nombre, { dir: 'auto' }),
+    el('div', 'cifras', `Coste ${eur(p.costeEUR)} + envío ${eur(p.envioEUR)} (${p.envioDias || '?'} días desde ${p.envioDesde}) · Venta ${eur(p.precioVenta)} · Margen ≈ ${eur(p.margenEUR)} (${p.margenPct} %)`),
+    el('div', 'meta', `Puntuación ${p.puntos}/100 · lo venden ${p.listados} tiendas en CJ${p.video ? ' · con vídeo' : ''}`),
+  );
+  if (p.analisis) info.append(el('div', 'detalle', p.analisis, { dir: 'auto' }));
+  c.append(img, info);
+  return c;
+}
+
+async function pintarTienda() {
+  const s = await api.llamar('tienda.estado');
+  if (!s || s.ok === false) return;
+  // Conexiones que faltan.
+  const faltan = [];
+  if (!s.conexiones.cj) faltan.push('CJ Dropshipping (Ajustes → Claves → Tienda → CJ_API_KEY)');
+  if (!s.conexiones.shopify) faltan.push('Shopify (Ajustes → Claves → SHOPIFY_TIENDA y SHOPIFY_TOKEN)');
+  if (!s.conexiones.metaAds) faltan.push('Anuncios de Meta (META_AD_ACCOUNT_ID y reconectar Facebook en REDES con ads_management)');
+  $('tdConexiones').replaceChildren(...(faltan.length ? [el('div', 'tarjeta', `Falta conectar: ${faltan.join(' · ')}`)] : []));
+
+  // 1 · Propuestas
+  const props = s.propuestas || [];
+  $('tdPropuestas').replaceChildren(...props.map((p) => {
+    const c = tarjetaProducto(p, { elegido: s.elegido?.pid === p.pid });
+    c.querySelector('div').append(boton(s.elegido?.pid === p.pid ? '✔ Elegido' : 'Elegir este', async () => {
+      const r = await api.llamar('tienda.elegir', p.pid);
+      if (!r.ok) return ui.mostrarError(r.error);
+      pintarTienda();
+    }, 'mini'));
+    return c;
+  }));
+
+  // 2-4 · Pasos del producto elegido
+  const pasos = $('tdPasos');
+  pasos.replaceChildren();
+  if (!s.elegido) return;
+  const paso = (titulo, ...hijos) => { const d = el('div', 'td-paso'); d.append(el('h3', 'titulo-seccion', titulo), ...hijos); pasos.append(d); };
+
+  // 2 · Shopify
+  const sh = el('div', 'ajuste-botones');
+  if (!s.shopify) {
+    sh.append(boton('🛍️ Crear la ficha en Shopify (borrador)', (ev) => bloquear(ev, async () => {
+      ui.añadirMensaje('sistema', 'Creando la ficha del producto en Shopify…');
+      const r = await api.llamar('tienda.crearEnShopify');
+      if (!r.ok) return ui.mostrarError(r.error);
+      ui.añadirMensaje('sistema', `Producto creado como BORRADOR: «${r.titulo}». Revísalo en Shopify y publícalo cuando te guste.`);
+      pintarTienda();
+    })));
+  } else {
+    const estadoTxt = el('span', 'meta', 'comprobando…');
+    api.llamar('tienda.estadoProducto').then((e) => { estadoTxt.textContent = e.ok ? (e.publicado ? `✔ publicado: ${e.url}` : '✘ en borrador: revísalo y publícalo en Shopify') : e.error; });
+    sh.append(boton('Abrir en Shopify', () => api.llamar('tienda.abrir', 'shopify'), 'mini'), estadoTxt);
+  }
+  paso('2 · Página en Shopify', sh);
+
+  // 3 · Anuncio (vídeo + textos)
+  const an = el('div', 'ajuste-botones');
+  an.append(boton(s.anuncio ? '🎬 Rehacer el anuncio' : '🎬 Crear el anuncio (vídeo vertical)', (ev) => bloquear(ev, async () => {
+    ui.añadirMensaje('sistema', 'Creando el vídeo del anuncio (guion, fotos, voz y montaje)…');
+    const r = await api.llamar('tienda.crearAnuncio');
+    if (!r.ok) return ui.mostrarError(r.error);
+    ui.añadirMensaje('sistema', `Anuncio listo: «${r.titular}». Pulsa ▶ Ver para revisarlo.`);
+    pintarTienda();
+  })));
+  if (s.anuncio) {
+    an.append(
+      boton('▶ Ver', () => api.llamar('tienda.verAnuncio'), 'mini'),
+      boton('Carpeta (para TikTok)', () => api.llamar('tienda.abrirCarpetaAnuncio'), 'mini'),
+      boton('Abrir TikTok Ads', () => api.llamar('tienda.abrir', 'tiktok'), 'mini'),
+    );
+  }
+  paso('3 · Anuncio', an, ...(s.anuncio ? [el('div', 'detalle', (s.anuncio.textos || []).map((t, i) => `${i + 1}. ${t}`).join('\n'), { dir: 'auto' })] : []));
+
+  // 4 · Campaña de Meta (en pausa) y activación
+  const mt = el('div');
+  if (s.anuncio && !s.meta) {
+    const pres = el('input', '', null, { type: 'number', min: '1', max: '1000', step: '1', value: '10', title: 'Presupuesto diario en euros' });
+    const fila = el('div', 'ajuste-botones');
+    fila.append(el('span', 'meta', 'Presupuesto diario (€):'), pres, boton('📣 Crear campaña en Meta (EN PAUSA)', (ev) => bloquear(ev, async () => {
+      ui.añadirMensaje('sistema', 'Subiendo el vídeo y creando la campaña en Meta (en pausa, no gasta nada)…');
+      const r = await api.llamar('tienda.crearCampanaMeta', Number(pres.value));
+      if (!r.ok) return ui.mostrarError(r.error);
+      ui.añadirMensaje('sistema', `Campaña creada EN PAUSA (${eur(r.presupuesto)}/día). Revísala y pulsa Activar cuando quieras.`);
+      pintarTienda();
+    })));
+    mt.append(fila);
+  } else if (s.meta) {
+    const fila = el('div', 'ajuste-botones');
+    fila.append(
+      el('span', 'meta', `${s.meta.estado === 'ACTIVE' ? '🟢 ACTIVA' : '⏸ EN PAUSA'} · ${eur(s.meta.presupuesto)}/día`),
+      boton('Abrir en Meta', () => api.llamar('tienda.abrir', 'meta'), 'mini'),
+      s.meta.estado === 'ACTIVE'
+        ? boton('⏸ Pausar', (ev) => bloquear(ev, async () => { const r = await api.llamar('tienda.pausarMeta'); if (!r.ok) ui.mostrarError(r.error); pintarTienda(); }))
+        : boton('▶ Activar (gasta dinero)', (ev) => bloquear(ev, async () => { const r = await api.llamar('tienda.activarMeta'); if (!r.ok && r.error !== 'Cancelado') ui.mostrarError(r.error); pintarTienda(); }), 'peligro'),
+    );
+    mt.append(fila);
+  } else {
+    mt.append(el('div', 'meta', 'Primero crea el anuncio (paso 3).'));
+  }
+  paso('4 · Campaña de Meta (Facebook e Instagram)', mt);
+}
+
+$('formTienda').addEventListener('submit', (e) => {
+  e.preventDefault();
+  const boton1 = e.target.querySelector('button');
+  bloquear({ target: boton1 }, async () => {
+    ui.añadirMensaje('sistema', 'Buscando productos en CJ y calculando costes, envío a España y margen… (1-3 minutos)');
+    const r = await api.llamar('tienda.buscar', $('tdNicho').value.trim());
+    if (!r.ok) return ui.mostrarError(r.error);
+    ui.añadirMensaje('sistema', `He encontrado ${r.propuestas.length} productos. Elige uno en la pestaña TIENDA.`);
+    pintarTienda();
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Memoria local (en la pestaña Memoria)
 // ---------------------------------------------------------------------------
 async function pintarHechos() {
@@ -480,6 +605,7 @@ window.Pestanas = {
     document.querySelector('[data-pestana="habilidades"]').addEventListener('click', pintarHabilidades);
     document.querySelector('[data-pestana="ajustes"]').addEventListener('click', pintarServicios);
     document.querySelector('[data-pestana="redes"]').addEventListener('click', pintarRedes);
+    document.querySelector('[data-pestana="tienda"]').addEventListener('click', pintarTienda);
     pintarRevisar();
   },
   avisoTarea() { pintarTareas(); },

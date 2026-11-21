@@ -35,6 +35,10 @@ const redesMeta = require('./redes/meta');
 const redesTikTok = require('./redes/tiktok');
 const recortes = require('./redes/recortes');
 const revision = require('./redes/revision');
+const tiendaInvestigar = require('./tienda/investigar');
+const tiendaShopify = require('./tienda/shopify');
+const tiendaAnuncios = require('./tienda/anuncios');
+const miniaturas = new Map();
 const path = require('path');
 
 let ctx = null;        // { cfg(), ventana(), mostrar(), panel(), icono }
@@ -315,6 +319,63 @@ const ACCIONES = {
     registro.anotar({ origen: 'reels', accion: `reels de ${path.basename(archivo)}`, decision: 'crear', motivo: 'derechos confirmados por el usuario' });
     return recortes.crear({ archivo });
   },
+  // TIENDA (dropshipping): buscar producto → Shopify (borrador) → anuncio → Meta (en pausa).
+  'tienda.estado': () => ({
+    ...tiendaInvestigar.leer(),
+    conexiones: { cj: claves.tiene('CJ_API_KEY'), shopify: claves.tiene('SHOPIFY_TOKEN') && claves.tiene('SHOPIFY_TIENDA'), metaAds: claves.tiene('META_ADS_TOKEN') && claves.tiene('META_AD_ACCOUNT_ID'), pagina: claves.tiene('META_PAGE_ID') },
+  }),
+  'tienda.buscar': (nicho) => tiendaInvestigar.buscar({ nicho: String(nicho || '').slice(0, 80), pensar: cerebro.pensar }),
+  'tienda.elegir': (pid) => tiendaInvestigar.elegir(String(pid || '')),
+  // Miniatura de un producto propuesto: la ventana no carga imágenes de internet
+  // (política de seguridad), así que se descarga aquí y se pasa como data: URI.
+  'tienda.miniatura': async (pid) => {
+    const est = tiendaInvestigar.leer();
+    const p = [...(est.propuestas || []), est.elegido].find((x) => x && x.pid === String(pid));
+    if (!p?.imagen) return null;
+    if (miniaturas.has(p.imagen)) return miniaturas.get(p.imagen);
+    const r = await require('./nucleo/http').pedir(p.imagen, { binario: true }, 20);
+    if (!r.ok) return null;
+    const jpg = await require('sharp')(r.buffer).resize(168, 168, { fit: 'cover' }).jpeg({ quality: 80 }).toBuffer();
+    const uri = `data:image/jpeg;base64,${jpg.toString('base64')}`;
+    miniaturas.set(p.imagen, uri);
+    return uri;
+  },
+  'tienda.crearEnShopify': () => tiendaShopify.crearProducto({ pensar: cerebro.pensar }),
+  'tienda.estadoProducto': () => tiendaShopify.estadoProducto().catch((e) => ({ ok: false, error: e.message })),
+  'tienda.crearAnuncio': () => tiendaAnuncios.crearAnuncio({ pensar: cerebro.pensar }),
+  'tienda.verAnuncio': async () => {
+    const a = tiendaInvestigar.leer().anuncio;
+    if (!a?.video) return { ok: false, error: 'Aún no hay anuncio' };
+    const e = await shell.openPath(a.video);
+    return e ? { ok: false, error: e } : { ok: true };
+  },
+  'tienda.abrirCarpetaAnuncio': async () => {
+    const a = tiendaInvestigar.leer().anuncio;
+    if (!a?.carpeta) return { ok: false, error: 'Aún no hay anuncio' };
+    const e = await shell.openPath(a.carpeta);
+    return e ? { ok: false, error: e } : { ok: true };
+  },
+  // Solo abre direcciones conocidas (no cualquier URL que llegue de la interfaz).
+  'tienda.abrir': (cual) => {
+    const est = tiendaInvestigar.leer();
+    const url = { shopify: est.shopify?.adminUrl, meta: est.meta?.url, tiktok: 'https://ads.tiktok.com/i18n/dashboard' }[cual];
+    if (!url) return { ok: false, error: 'No hay nada que abrir todavía' };
+    shell.openExternal(url);
+    return { ok: true };
+  },
+  'tienda.crearCampanaMeta': (presupuesto) => tiendaAnuncios.crearCampanaMeta({ presupuestoDiario: Number(presupuesto) }),
+  'tienda.activarMeta': async () => {
+    const m = tiendaInvestigar.leer().meta;
+    if (!m?.campana) return { ok: false, error: 'No hay ninguna campaña de Meta creada' };
+    const { response } = await dialog.showMessageBox(ctx.ventana(), {
+      type: 'warning', buttons: ['Sí, activar y gastar', 'No'], defaultId: 1, cancelId: 1, title: 'Jarvis',
+      message: `¿Activar la campaña de Meta? Gastará hasta ${m.presupuesto} € al día de tu tarjeta.`,
+      detail: 'Podrás pausarla cuando quieras desde Jarvis o desde el Administrador de anuncios.',
+    });
+    if (response !== 0) { registro.anotar({ origen: 'tienda', accion: 'activar campaña de Meta', decision: 'rechazado' }); return { ok: false, error: 'Cancelado' }; }
+    return tiendaAnuncios.activarMeta();
+  },
+  'tienda.pausarMeta': () => tiendaAnuncios.pausarMeta(),
   // Vídeos nuevos: quedan en «Por revisar».
   'video.crearTema': (tema) => creadorVideos.crearDesdeTema({ tema: String(tema || '').slice(0, 500), pensar: cerebro.pensar, destino: 'revisar' }),
   'video.crearCripto': () => creadorVideos.crear({ pensar: cerebro.pensar, destino: 'revisar' }),

@@ -38,7 +38,9 @@ async function conectar() {
   const buscada = (claves.obtener('META_PAGINA') || '').toLowerCase();
   const p = lista.find((x) => buscada && x.name.toLowerCase() === buscada) || lista[0];
   const ig = p.instagram_business_account || null;
-  claves.guardar({ META_PAGE_TOKEN: p.access_token, META_PAGE_ID: p.id, META_IG_ID: ig ? ig.id : '', META_PAGINA: p.name, META_USER_TOKEN: '' });
+  // META_ADS_TOKEN: token de usuario de larga duración (~60 días) para crear
+  // campañas (necesita el permiso ads_management). El de la Página no sirve para anuncios.
+  claves.guardar({ META_PAGE_TOKEN: p.access_token, META_PAGE_ID: p.id, META_IG_ID: ig ? ig.id : '', META_PAGINA: p.name, META_USER_TOKEN: '', META_ADS_TOKEN: largo.datos.access_token });
   registro.anotar({ origen: 'redes', accion: 'conectar Facebook/Instagram', detalle: { pagina: p.name, instagram: ig?.username || null } });
   return { ok: true, pagina: p.name, instagram: ig?.username || null, otras: lista.length - 1 };
 }
