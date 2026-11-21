@@ -38,6 +38,7 @@ const revision = require('./redes/revision');
 const tiendaInvestigar = require('./tienda/investigar');
 const tiendaShopify = require('./tienda/shopify');
 const tiendaAnuncios = require('./tienda/anuncios');
+const tiendaPedidos = require('./tienda/pedidos');
 const miniaturas = new Map();
 const path = require('path');
 
@@ -161,6 +162,7 @@ async function ejecutarRutina(id, { desdeWindows = false } = {}) {
   }
   const res = id === 'youtube'
     ? await youtube.ejecutar({ pensar: cerebro.pensar, crear: (destino) => creadorVideos.crear({ pensar: cerebro.pensar, destino }) })
+    : id === 'pedidos' ? await tiendaPedidos.rutina()
     : await monitores.ejecutar(r, { n8nChat: (t) => (usarN8n() && r.motor === 'n8n' ? n8nChat(t) : buscarWeb(t)), manos: (t) => manosYEsperar(t, `monitor:${r.nombre}`), pensar: cerebro.pensar });
   programador.anotarEjecucion(id, res);
   if (res.ok && res.novedad) {
@@ -376,6 +378,21 @@ const ACCIONES = {
     return tiendaAnuncios.activarMeta();
   },
   'tienda.pausarMeta': () => tiendaAnuncios.pausarMeta(),
+  // Pedidos: revisar (gratis) y confirmar en CJ (gasta tu saldo: siempre pregunta).
+  'tienda.pedidos': () => tiendaPedidos.lista(),
+  'tienda.revisarPedidos': () => tiendaPedidos.rutina(),
+  'tienda.confirmarPedido': async (pid) => {
+    const p = tiendaPedidos.lista().find((x) => x.id === String(pid));
+    if (!p) return { ok: false, error: 'No encuentro ese pedido' };
+    const { response } = await dialog.showMessageBox(ctx.ventana(), {
+      type: 'question', buttons: ['Sí, comprar en CJ', 'No'], defaultId: 1, cancelId: 1, title: 'Jarvis',
+      message: `¿Comprar en CJ el pedido ${p.nombre} de ${p.cliente} (${p.ciudad})?`,
+      detail: `Se pagará con tu saldo de CJ unos ${p.costeEstimadoEUR} € (producto + envío ${p.envio?.nombre || ''}). Tu cliente pagó ${p.total}.`,
+    });
+    if (response !== 0) { registro.anotar({ origen: 'pedidos', accion: `comprar ${p.nombre} en CJ`, decision: 'rechazado' }); return { ok: false, error: 'Cancelado' }; }
+    return tiendaPedidos.confirmar(p.id);
+  },
+  'tienda.pedidoManual': (pid) => tiendaPedidos.marcarManual(String(pid)),
   // Vídeos nuevos: quedan en «Por revisar».
   'video.crearTema': (tema) => creadorVideos.crearDesdeTema({ tema: String(tema || '').slice(0, 500), pensar: cerebro.pensar, destino: 'revisar' }),
   'video.crearCripto': () => creadorVideos.crear({ pensar: cerebro.pensar, destino: 'revisar' }),

@@ -84,7 +84,9 @@ async function crearProducto({ pensar } = {}) {
     if (res.userErrors?.length) return { ok: false, error: `Shopify: ${res.userErrors.map((e) => e.message).join('; ')}` };
     const id = res.product.id;
     const shopify = { id, handle: res.product.handle, titulo: t.titulo, adminUrl: `https://${tienda}/admin/products/${id.split('/').pop()}`, tiendaUrl: `https://${tienda}/products/${res.product.handle}` };
-    investigar.escribir({ ...estado, shopify });
+    // Relación producto de Shopify → variante de CJ (la usan los pedidos automáticos).
+    const productos = { ...(estado.productos || {}), [id]: { pid: p.pid, vid: p.vid, nombre: t.titulo, costeEUR: p.costeEUR, envioEUR: p.envioEUR } };
+    investigar.escribir({ ...estado, shopify, productos });
     registro.anotar({ origen: 'tienda', accion: `crear producto en Shopify «${t.titulo}» (borrador)`, decision: 'hecho', detalle: shopify.adminUrl });
     return { ok: true, ...shopify };
   } catch (e) {

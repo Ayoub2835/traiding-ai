@@ -125,7 +125,7 @@ async function pintarRutinas(lista) {
     }));
     if (r.id === 'youtube') pintarYoutube(c, r, botones);
     // Las rutinas fijas no se pueden quitar (solo activar/desactivar).
-    if (!['resumen', 'informe', 'caza', 'youtube'].includes(r.id)) botones.append(boton('Quitar', async () => { await api.llamar('rutinas.quitar', r.id); }, 'peligro'));
+    if (!['resumen', 'informe', 'caza', 'youtube', 'pedidos'].includes(r.id)) botones.append(boton('Quitar', async () => { await api.llamar('rutinas.quitar', r.id); }, 'peligro'));
     c.append(botones);
     return c;
   }));
@@ -305,7 +305,46 @@ function tarjetaProducto(p, { elegido = false } = {}) {
   return c;
 }
 
+const ESTADO_PEDIDO = {
+  por_confirmar: ['Por confirmar', 'ambar'], problema: ['Problema', 'rojo'], creado_en_cj: ['Creado en CJ (sin pagar)', 'rojo'],
+  pagado: ['Pagado en CJ · esperando envío', 'azul'], enviado: ['Enviado', 'verde'], manual: ['Hecho a mano', 'gris'],
+};
+async function pintarPedidos() {
+  const lista = await api.llamar('tienda.pedidos');
+  const cont = $('tdPedidos');
+  if (!Array.isArray(lista) || !lista.length) return vacio(cont, 'Aún no hay pedidos.');
+  cont.replaceChildren(...lista.map((p) => {
+    const [txt, color] = ESTADO_PEDIDO[p.estado] || [p.estado, 'gris'];
+    const c = el('div', 'tarjeta');
+    const cab = el('div', 'tarea-cab');
+    cab.append(el('span', `chip ${color}`, txt), el('span', 'meta', `${p.nombre} · ${hora(p.fecha)}`));
+    c.append(cab,
+      el('div', 'detalle', `${p.cliente} · ${p.ciudad} · pagó ${p.total}`, { dir: 'auto' }),
+      el('div', 'meta', `${(p.lineas || []).map((l) => `${l.cantidad}× ${l.titulo}`).join(', ')}${p.costeEstimadoEUR ? ` · te cuesta ≈ ${eur(p.costeEstimadoEUR)}` : ''}${p.seguimiento ? ` · seguimiento ${p.seguimiento}` : ''}`, { dir: 'auto' }));
+    if (p.problema) c.append(el('div', 'detalle error', p.problema));
+    if (p.estado === 'por_confirmar' || p.estado === 'problema') {
+      const b = el('div', 'ajuste-botones');
+      if (p.estado === 'por_confirmar') {
+        b.append(boton('✔ Confirmar y pagar en CJ', (ev) => bloquear(ev, async () => {
+          const r = await api.llamar('tienda.confirmarPedido', p.id);
+          if (!r.ok) { if (r.error !== 'Cancelado') ui.mostrarError(r.error); } else ui.añadirMensaje('sistema', `Pedido ${p.nombre} comprado en CJ (${r.cjOrderId}). El seguimiento se pondrá solo en Shopify cuando lo envíen.`);
+          pintarPedidos();
+        })));
+      }
+      b.append(boton('Ya lo hice a mano', async () => { await api.llamar('tienda.pedidoManual', p.id); pintarPedidos(); }, 'mini'));
+      c.append(b);
+    }
+    return c;
+  }));
+}
+$('btnRevisarPedidos').addEventListener('click', (ev) => bloquear(ev, async () => {
+  const r = await api.llamar('tienda.revisarPedidos');
+  if (!r.ok) ui.mostrarError(r.error); else ui.añadirMensaje('sistema', r.resumen);
+  pintarPedidos();
+}));
+
 async function pintarTienda() {
+  pintarPedidos();
   const s = await api.llamar('tienda.estado');
   if (!s || s.ok === false) return;
   // Conexiones que faltan.

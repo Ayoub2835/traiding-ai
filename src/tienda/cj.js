@@ -90,4 +90,4 @@ async function probar() {
   return 'CJ Dropshipping OK';
 }
 
-module.exports = { buscar, detalle, envio, probar, token };
+module.exports = { buscar, detalle, envio, probar, token, llamar };

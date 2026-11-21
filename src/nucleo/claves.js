@@ -38,7 +38,7 @@ const CATALOGO = [
   { clave: 'TWILIO_DESDE', grupo: 'Avisos', etiqueta: 'Número Twilio (desde)', ayuda: 'Formato internacional, p. ej. +34600000000' },
   { clave: 'TWILIO_A', grupo: 'Avisos', etiqueta: 'Tu teléfono (a quién llamar)', secreta: true },
   { clave: 'SHOPIFY_TIENDA', grupo: 'Manos', etiqueta: 'Tienda Shopify (xxx.myshopify.com)' },
-  { clave: 'SHOPIFY_TOKEN', grupo: 'Manos', etiqueta: 'Token Admin API de Shopify', secreta: true, ayuda: 'Shopify → Configuración → Apps → Desarrollar apps → token de Admin API.' },
+  { clave: 'SHOPIFY_TOKEN', grupo: 'Manos', etiqueta: 'Token Admin API de Shopify', secreta: true, ayuda: 'Shopify → Configuración → Apps → Desarrollar apps → crear app → permisos de Admin API: write_products, read_products, read_orders, write_merchant_managed_fulfillment_orders → instalar → token de Admin API.' },
   { clave: 'N8N_MCP_URL', grupo: 'Manos', etiqueta: 'URL MCP de n8n (opcional)', ayuda: 'n8n → Settings → MCP access. Deja que las manos lean/editen flujos.' },
   { clave: 'N8N_MCP_TOKEN', grupo: 'Manos', etiqueta: 'Token MCP de n8n', secreta: true },
   { clave: 'CLAUDE_CODE_RUTA', grupo: 'Manos', etiqueta: 'Comando de Claude Code', defecto: 'claude' },
