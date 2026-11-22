@@ -43,6 +43,9 @@ const tiendaControl = require('./tienda/control');
 const telegram = require('./movil/telegram');
 const tiendaClientes = require('./tienda/clientes');
 const tiendas = require('./tienda/tiendas');
+const tiendaEspia = require('./tienda/espia');
+const tiendaPaginas = require('./tienda/paginas');
+const tiendaManana = require('./tienda/manana');
 
 // Rutinas de tienda: con varias tiendas, se hace en cada una y se junta el aviso.
 async function enCadaTienda(fn) {
@@ -189,6 +192,7 @@ async function ejecutarRutina(id, { desdeWindows = false } = {}) {
     : id === 'pedidos' ? await enCadaTienda(() => tiendaPedidos.rutina())
     : id === 'ventas' ? await enCadaTienda(() => tiendaControl.informe())
     : id === 'clientes' ? await tiendaClientes.rutina({ pensar: cerebro.pensar })
+    : id === 'negocio' ? await tiendaManana.resumen()
     : await monitores.ejecutar(r, { n8nChat: (t) => (usarN8n() && r.motor === 'n8n' ? n8nChat(t) : buscarWeb(t)), manos: (t) => manosYEsperar(t, `monitor:${r.nombre}`), pensar: cerebro.pensar });
   programador.anotarEjecucion(id, res);
   if (res.ok && res.novedad) {
@@ -373,6 +377,37 @@ const ACCIONES = {
     if (response !== 0) return { ok: false, error: 'Cancelado' };
     return tiendas.quitar(t.id);
   },
+  // Ganadores (Biblioteca de anuncios de Meta), versiones del anuncio y guiones UGC.
+  'tienda.espiar': (terminos) => tiendaEspia.buscar({ terminos: String(terminos || '').slice(0, 300), pensar: cerebro.pensar }),
+  'tienda.abrirGanador': (i) => {
+    const g = (tiendaInvestigar.leer().ganadores || [])[Number(i)];
+    if (!g || !/^https:\/\/www\.facebook\.com\/ads\/library\/\?id=\d+$/.test(g.enlace || '')) return { ok: false, error: 'No hay enlace para ese anuncio' };
+    shell.openExternal(g.enlace);
+    return { ok: true };
+  },
+  'tienda.variantes': (n) => tiendaAnuncios.crearVariantes({ pensar: cerebro.pensar, n: Number(n) || 3 }),
+  'tienda.verVariante': async (i) => {
+    const v = (tiendaInvestigar.leer().variantes || [])[Number(i)];
+    if (!v?.video) return { ok: false, error: 'Esa versión no existe' };
+    const e = await shell.openPath(v.video);
+    return e ? { ok: false, error: e } : { ok: true };
+  },
+  'tienda.ugc': () => tiendaAnuncios.guionesUGC({ pensar: cerebro.pensar }),
+  'tienda.abrirUgc': async () => {
+    const u = tiendaInvestigar.leer().ugc;
+    if (!u?.archivo) return { ok: false, error: 'Aún no hay guiones' };
+    const e = await shell.openPath(u.archivo);
+    return e ? { ok: false, error: e } : { ok: true };
+  },
+  // Tienda completa: textos legales y páginas (se ven antes de ponerlos en Shopify).
+  'tienda.paginasPreparar': (datos) => tiendaPaginas.preparar(datos || {}),
+  'tienda.paginasAplicar': async () => {
+    const t = tiendas.actual();
+    const { response } = await dialog.showMessageBox(ctx.ventana(), { type: 'question', buttons: ['Poner en Shopify', 'Cancelar'], defaultId: 1, cancelId: 1, title: 'Políticas y páginas', message: `¿Poner las políticas y páginas en «${t?.nombre || 'tu tienda'}»?`, detail: 'Las políticas (devoluciones, privacidad, envíos, términos, aviso legal) se verán en tu tienda al momento y sustituyen a las que tengas. Las páginas se crean OCULTAS. Son plantillas: revísalas.' });
+    if (response !== 0) return { ok: false, error: 'Cancelado' };
+    return tiendaPaginas.aplicar();
+  },
+  'tienda.comprobar': () => tiendaPaginas.comprobar().catch((e) => ({ ok: false, error: e.message })),
   'tienda.productoPropio': (datos) => tiendaShopify.crearPropio({ ...(datos || {}), pensar: cerebro.pensar }),
   'tienda.pedidoEnviado': (pid, datos) => tiendaPedidos.enviadoPorMi(String(pid), datos || {}),
   'tienda.buscar': (nicho) => tiendaInvestigar.buscar({ nicho: String(nicho || '').slice(0, 80), pensar: cerebro.pensar }),

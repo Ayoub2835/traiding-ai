@@ -112,7 +112,7 @@ async function crearPropio({ nombre, precio, coste = 0, descripcion = '', imagen
   const fotos = (Array.isArray(imagenes) ? imagenes : String(imagenes).split(/\s+/)).map((u) => String(u).trim()).filter((u) => /^https:\/\/\S+$/.test(u)).slice(0, 8);
   const estado = investigar.leer();
   const elegido = { pid: `propio-${Date.now()}`, vid: null, propio: true, nombre: n, imagenes: fotos, imagen: fotos[0] || '', descripcionProveedor: String(descripcion).slice(0, 3000), categoria: '', busqueda: '', precioVenta: +pr.toFixed(2), costeEUR: Math.max(0, Number(String(coste).replace(',', '.')) || 0), envioEUR: 0, envioDias: String(envioDias).slice(0, 10) };
-  investigar.escribir({ ...estado, elegido, shopify: null, anuncio: null, meta: null });
+  investigar.escribir({ ...estado, elegido, shopify: null, anuncio: null, meta: null, variantes: null, ugc: null });
   return crearProducto({ pensar });
 }
 

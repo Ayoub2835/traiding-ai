@@ -154,7 +154,15 @@ Y además, en automático:
 - **Ventas y anuncios** (21:30): ventas, gasto en anuncios y beneficio real de hoy y 7 días. Si la campaña gasta sin vender, propone pausarla (con `TIENDA_AUTOPAUSA=si` la pausa sola; activar, nunca).
 - **Correos de clientes** (cada hora): detecta los correos de clientes, busca su pedido y seguimiento y prepara la respuesta. Al aprobarla va a tus **Borradores de Gmail**: Jarvis nunca envía correos.
 
-Permisos de la app de Shopify: `write_products`, `read_products`, `read_orders`, `write_merchant_managed_fulfillment_orders`.
+Permisos de la app de Shopify: `write_products`, `read_products`, `read_orders`, `write_merchant_managed_fulfillment_orders`, `write_content` y `write_legal_policies` (estos dos, para las páginas y políticas).
+
+Para vender más:
+- **Productos ganadores**: busca en la Biblioteca de anuncios de Meta anunciantes con anuncios de 14 días o más activos en España, dice qué producto parece y lo busca en CJ con un botón. Meta pide confirmar tu identidad una vez (facebook.com/ID).
+- **3 versiones del anuncio** con enfoques distintos y **guiones para grabarte** con el móvil (UGC). Todas las versiones van al mismo conjunto de Meta (test A/B).
+- **Campañas de VENTAS** con el Píxel de Meta (`META_PIXEL_ID`); sin píxel, de tráfico. Siempre en pausa.
+- **Tienda completa**: aviso legal, devoluciones (14 días), garantía (3 años), envíos, privacidad y términos según la ley española, y páginas de Contacto, Preguntas frecuentes y Sobre nosotros (ocultas hasta que las publiques). Son plantillas: revísalas.
+- **¿Qué le falta a mi tienda?**: comprueba políticas, páginas, píxel y carritos abandonados, y explica cómo activar los correos de carrito abandonado de Shopify, las reseñas y el chat (Shopify Inbox con las respuestas rápidas que prepara Jarvis).
+- **Resumen del negocio** (08:15, al móvil): cada tienda, pedidos pendientes, clientes, vídeos y mercado; el día 1, las cuentas del mes.
 
 **Varias tiendas, con o sin dropshipping** (TIENDA → Mis tiendas → ＋ Añadir tienda): nombre, dirección `mitienda.myshopify.com`, token de su app y tipo.
 - *Con dropshipping*: todo lo de arriba (CJ).

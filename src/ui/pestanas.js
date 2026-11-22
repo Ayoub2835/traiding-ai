@@ -125,7 +125,7 @@ async function pintarRutinas(lista) {
     }));
     if (r.id === 'youtube') pintarYoutube(c, r, botones);
     // Las rutinas fijas no se pueden quitar (solo activar/desactivar).
-    if (!['resumen', 'informe', 'caza', 'youtube', 'pedidos', 'ventas', 'clientes'].includes(r.id)) botones.append(boton('Quitar', async () => { await api.llamar('rutinas.quitar', r.id); }, 'peligro'));
+    if (!['resumen', 'informe', 'caza', 'youtube', 'pedidos', 'ventas', 'clientes', 'negocio'].includes(r.id)) botones.append(boton('Quitar', async () => { await api.llamar('rutinas.quitar', r.id); }, 'peligro'));
     c.append(botones);
     return c;
   }));
@@ -412,6 +412,8 @@ async function pintarTienda() {
   const s = await api.llamar('tienda.estado');
   if (!s || s.ok === false) return;
   pintarTiendas(s);
+  pintarGanadores(s.ganadores || []);
+  pintarLegal(s);
   const stock = s.tienda?.tipo === 'stock';
   $('tdBuscarCJ').classList.toggle('oculto', stock);
   $('tdPropio').classList.toggle('oculto', !stock);
@@ -473,7 +475,28 @@ async function pintarTienda() {
       boton('Abrir TikTok Ads', () => api.llamar('tienda.abrir', 'tiktok'), 'mini'),
     );
   }
-  paso('3 · Anuncio', an, ...(s.anuncio ? [el('div', 'detalle', (s.anuncio.textos || []).map((t, i) => `${i + 1}. ${t}`).join('\n'), { dir: 'auto' })] : []));
+  const extra = el('div', 'ajuste-botones');
+  extra.append(
+    boton(s.variantes?.length ? '🎭 Rehacer 3 versiones (test A/B)' : '🎭 Crear 3 versiones más (test A/B)', (ev) => bloquear(ev, async () => {
+      ui.añadirMensaje('sistema', 'Creando 3 versiones del anuncio con enfoques distintos (unos minutos)…');
+      const r = await api.llamar('tienda.variantes', 3);
+      if (!r.ok) return ui.mostrarError(r.error);
+      ui.añadirMensaje('sistema', `${r.variantes.length} versiones listas. Irán juntas en la campaña de Meta y Meta da más alcance a la que mejor funciona.`);
+      pintarTienda();
+    }), 'mini'),
+    boton('📝 Guiones para grabarte (UGC)', (ev) => bloquear(ev, async () => {
+      const r = await api.llamar('tienda.ugc');
+      if (!r.ok) return ui.mostrarError(r.error);
+      ui.añadirMensaje('sistema', 'Guiones listos para grabar con el móvil. Te abro el archivo.');
+      api.llamar('tienda.abrirUgc');
+    }), 'mini'),
+  );
+  const vers = (s.variantes || []).map((v, i) => {
+    const f = el('div', 'ajuste-botones');
+    f.append(el('span', 'meta', `Versión ${i + 1}: «${v.gancho || v.titular}»`), boton('▶ Ver', () => api.llamar('tienda.verVariante', i), 'mini'));
+    return f;
+  });
+  paso('3 · Anuncio', an, ...(s.anuncio ? [el('div', 'detalle', (s.anuncio.textos || []).map((t, i) => `${i + 1}. ${t}`).join('\n'), { dir: 'auto' }), extra, ...vers] : []));
 
   // 4 · Campaña de Meta (en pausa) y activación
   const mt = el('div');
@@ -491,7 +514,7 @@ async function pintarTienda() {
   } else if (s.meta) {
     const fila = el('div', 'ajuste-botones');
     fila.append(
-      el('span', 'meta', `${s.meta.estado === 'ACTIVE' ? '🟢 ACTIVA' : '⏸ EN PAUSA'} · ${eur(s.meta.presupuesto)}/día`),
+      el('span', 'meta', `${s.meta.estado === 'ACTIVE' ? '🟢 ACTIVA' : '⏸ EN PAUSA'} · ${eur(s.meta.presupuesto)}/día · ${s.meta.tipo === 'ventas' ? 'campaña de VENTAS (Píxel)' : 'campaña de tráfico'}${(s.meta.anuncios || []).length > 1 ? ` · ${s.meta.anuncios.length} anuncios (A/B)` : ''}`),
       boton('Abrir en Meta', () => api.llamar('tienda.abrir', 'meta'), 'mini'),
       s.meta.estado === 'ACTIVE'
         ? boton('⏸ Pausar', (ev) => bloquear(ev, async () => { const r = await api.llamar('tienda.pausarMeta'); if (!r.ok) ui.mostrarError(r.error); pintarTienda(); }))
@@ -503,6 +526,64 @@ async function pintarTienda() {
   }
   paso('4 · Campaña de Meta (Facebook e Instagram)', mt);
 }
+
+// Ganadores de la Biblioteca de anuncios de Meta.
+function pintarGanadores(lista) {
+  $('tdGanadores').replaceChildren(...lista.map((g, i) => {
+    const c = el('div', 'tarjeta');
+    c.append(
+      el('div', 'tarea-cab', `${g.producto || g.pagina} · ${g.diasMax} días activo · ${g.anuncios} anuncio(s) · ${g.puntos}/100`, { dir: 'auto' }),
+      el('div', 'meta', `Anunciante: ${g.pagina}${g.alcance ? ` · alcance UE ${g.alcance.toLocaleString('es-ES')}` : ''}`, { dir: 'auto' }),
+      ...(g.textos?.length ? [el('div', 'detalle', g.textos.join('\n'), { dir: 'auto' })] : []),
+    );
+    const b = el('div', 'ajuste-botones');
+    if (g.enlace) b.append(boton('Ver el anuncio', () => api.llamar('tienda.abrirGanador', i), 'mini'));
+    if (g.busqueda) {
+      b.append(boton(`🔎 Buscarlo en CJ («${g.busqueda}»)`, () => { $('tdNicho').value = g.busqueda; $('formTienda').requestSubmit(); }, 'mini'));
+    }
+    c.append(b);
+    return c;
+  }));
+}
+$('formEspia').addEventListener('submit', (e) => {
+  e.preventDefault();
+  bloquear({ target: e.target.querySelector('button') }, async () => {
+    ui.añadirMensaje('sistema', 'Mirando la Biblioteca de anuncios de Meta en España…');
+    const r = await api.llamar('tienda.espiar', $('tdEspia').value.trim());
+    if (!r.ok) return ui.mostrarError(r.error);
+    ui.añadirMensaje('sistema', `${r.ganadores.length} anunciantes con anuncios de 2 semanas o más. Mira la lista en TIENDA.`);
+    pintarTienda();
+  });
+});
+
+// Tienda completa: textos legales, páginas, lo que falta y respuestas del chat.
+function pintarLegal(s) {
+  const d = s.datosLegales || {};
+  for (const [id, k] of [['lgTitular', 'titular'], ['lgNif', 'nif'], ['lgDireccion', 'direccion'], ['lgEmail', 'email'], ['lgTelefono', 'telefono'], ['lgMarca', 'marca']]) if (!$(id).value && d[k]) $(id).value = d[k];
+  const p = s.paginas;
+  $('tdLegal').textContent = p?.politicas ? `Textos preparados (${hora(p.preparado)})${p.aplicado ? ` · puestos en Shopify (${hora(p.aplicado)})` : ' · aún no están en Shopify: pulsa «Poner en Shopify»'}.` : '';
+  $('tdRespuestas').textContent = p?.respuestas?.length ? `Respuestas rápidas para el chat (Shopify Inbox → Preguntas frecuentes):\n${p.respuestas.map((x) => `• ${x.pregunta}\n  ${x.respuesta}`).join('\n')}` : '';
+}
+$('formLegal').addEventListener('submit', (e) => {
+  e.preventDefault();
+  const r = api.llamar('tienda.paginasPreparar', { titular: $('lgTitular').value, nif: $('lgNif').value, direccion: $('lgDireccion').value, email: $('lgEmail').value, telefono: $('lgTelefono').value, marca: $('lgMarca').value });
+  r.then((x) => { if (!x.ok) return ui.mostrarError(x.error); ui.añadirMensaje('sistema', 'Textos legales y páginas preparados. Revísalos y pulsa «Poner en Shopify».'); pintarTienda(); });
+});
+$('btnLegalAplicar').addEventListener('click', (ev) => bloquear(ev, async () => {
+  const r = await api.llamar('tienda.paginasAplicar');
+  if (!r.ok) { if (r.error !== 'Cancelado') ui.mostrarError(r.error); return; }
+  ui.añadirMensaje('sistema', `Puesto en Shopify: ${r.hechas.join(', ')}.${r.aviso ? ` ${r.aviso}` : ''} Las páginas están ocultas: publícalas en Shopify → Tienda online → Páginas.`);
+  pintarTienda();
+}));
+$('btnComprobar').addEventListener('click', (ev) => bloquear(ev, async () => {
+  const r = await api.llamar('tienda.comprobar');
+  if (!r.ok) return ui.mostrarError(r.error);
+  $('tdComprobar').replaceChildren(...r.items.map((x) => {
+    const c = el('div', 'tarjeta');
+    c.append(el('div', 'tarea-cab', `${x.ok === true ? '✅' : x.ok === false ? '❌' : '💡'} ${x.texto}`), ...(x.ok !== true && x.ayuda ? [el('div', 'meta', x.ayuda)] : []));
+    return c;
+  }));
+}));
 
 // Selector de tiendas: elegir, añadir y quitar.
 function pintarTiendas(s) {

@@ -116,7 +116,7 @@ function elegir(pid) {
   const estado = leer();
   const p = (estado.propuestas || []).find((x) => x.pid === String(pid));
   if (!p) return { ok: false, error: 'Ese producto ya no está en las propuestas' };
-  escribir({ ...estado, elegido: p, shopify: null, anuncio: null, meta: null });
+  escribir({ ...estado, elegido: p, shopify: null, anuncio: null, meta: null, variantes: null, ugc: null });
   return { ok: true, elegido: p };
 }
 

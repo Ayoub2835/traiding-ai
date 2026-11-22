@@ -25,6 +25,8 @@ const FIJAS = [
   { id: 'ventas', nombre: 'Ventas y anuncios', activo: true, horario: { tipo: 'diario', hora: '21:30' }, aviso: 'movil', ultima: null, windows: false },
   // Correos de clientes: prepara respuestas (nunca envía nada).
   { id: 'clientes', nombre: 'Correos de clientes', activo: true, horario: { tipo: 'cada', minutos: 60 }, aviso: 'movil', ultima: null, windows: false },
+  // Resumen del negocio al móvil: tiendas, pedidos pendientes, clientes, vídeos y mercado.
+  { id: 'negocio', nombre: 'Resumen del negocio', activo: true, horario: { tipo: 'diario', hora: '08:15' }, aviso: 'movil', ultima: null, windows: false },
   { id: 'youtube', nombre: 'Vídeo del día', activo: false, horario: { tipo: 'diario', hora: '18:00' }, aviso: 'notificacion', ultima: null, windows: false },
 ];
 

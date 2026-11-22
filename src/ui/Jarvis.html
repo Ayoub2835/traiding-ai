@@ -145,6 +145,13 @@
         </form>
         <div class="lista" id="tdConexiones"></div>
         <div id="tdBuscarCJ">
+          <h3 class="titulo-seccion">0 · Productos ganadores (anuncios que llevan semanas activos)</h3>
+          <p class="nota">Jarvis mira la Biblioteca de anuncios de Meta en España: si una tienda sigue pagando un anuncio 2 semanas o más, suele ser porque vende. Es una pista; haz siempre tus propios vídeos y fotos.</p>
+          <form id="formEspia" class="td-form" autocomplete="off">
+            <input id="tdEspia" type="text" dir="auto" maxlength="300" placeholder="Palabras separadas por comas (opcional): p. ej. mascotas, cocina, coche">
+            <div class="ajuste-botones"><button type="submit">🕵️ Buscar ganadores</button></div>
+          </form>
+          <div class="lista" id="tdGanadores"></div>
           <h3 class="titulo-seccion">1 · Buscar productos</h3>
           <form id="formTienda" autocomplete="off">
             <input id="tdNicho" type="text" dir="auto" placeholder="Nicho (opcional): p. ej. cocina, mascotas, coche…">
@@ -165,6 +172,20 @@
           </form>
         </div>
         <div id="tdPasos"></div>
+        <h3 class="titulo-seccion">Tienda completa (textos legales, páginas y chat)</h3>
+        <p class="nota">Con tus datos, Jarvis escribe aviso legal, devoluciones (14 días), envíos, privacidad y términos, más las páginas de Contacto, Preguntas frecuentes y Sobre nosotros. Son plantillas según la ley española: revísalas.</p>
+        <form id="formLegal" class="td-form" autocomplete="off">
+          <input id="lgTitular" type="text" dir="auto" maxlength="120" placeholder="Titular: tu nombre completo o el de tu empresa">
+          <input id="lgNif" type="text" maxlength="20" placeholder="NIF / NIE / CIF">
+          <input id="lgDireccion" type="text" dir="auto" maxlength="200" placeholder="Dirección (calle, número, CP, ciudad)">
+          <input id="lgEmail" type="text" maxlength="120" placeholder="Email de atención al cliente">
+          <input id="lgTelefono" type="text" maxlength="30" placeholder="Teléfono (opcional)">
+          <input id="lgMarca" type="text" dir="auto" maxlength="60" placeholder="Nombre de la tienda / marca (opcional)">
+          <div class="ajuste-botones"><button type="submit">📝 Preparar textos</button><button type="button" id="btnLegalAplicar">Poner en Shopify</button><button type="button" id="btnComprobar">✅ ¿Qué le falta a mi tienda?</button></div>
+        </form>
+        <div class="detalle" id="tdLegal"></div>
+        <div class="lista" id="tdComprobar"></div>
+        <div class="detalle" id="tdRespuestas"></div>
         <h3 class="titulo-seccion">Pedidos</h3>
         <p class="nota">Cada 30 minutos Jarvis mira tus pedidos de Shopify y te avisa. Comprarlos en CJ gasta tu saldo de CJ: siempre te lo pregunta. El seguimiento se pone solo en Shopify.</p>
         <div class="ajuste-botones"><button type="button" id="btnRevisarPedidos">🔄 Revisar pedidos ahora</button><button type="button" id="btnInforme">📊 Ventas y beneficio</button></div>
