@@ -20,6 +20,8 @@ function hostsPermitidos(cfg) {
   if (claves.tiene('NTFY_TEMA')) add(claves.obtener('NTFY_SERVIDOR'));
   if (claves.tiene('TWILIO_SID')) add('https://api.twilio.com');
   if (claves.tiene('SHOPIFY_TIENDA')) add(`https://${claves.obtener('SHOPIFY_TIENDA')}`);
+  // Todas tus tiendas de Shopify (pestaña TIENDA → ＋ Añadir tienda).
+  try { for (const t of require('../tienda/tiendas').lista()) if (t.dominio) add(`https://${t.dominio}`); } catch (_) { /* sin datos aún */ }
   for (const u of (cfg && cfg.noticias) || []) add(u.url || u);
   add('https://news.google.com'); // búsqueda gratis de las rutinas (Google News RSS)
   // Vídeos y tienda: datos públicos sin clave (precios cripto, miedo/codicia, cambio €).

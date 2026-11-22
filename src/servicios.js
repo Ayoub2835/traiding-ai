@@ -42,6 +42,27 @@ const tiendaPedidos = require('./tienda/pedidos');
 const tiendaControl = require('./tienda/control');
 const telegram = require('./movil/telegram');
 const tiendaClientes = require('./tienda/clientes');
+const tiendas = require('./tienda/tiendas');
+
+// Rutinas de tienda: con varias tiendas, se hace en cada una y se junta el aviso.
+async function enCadaTienda(fn) {
+  const res = await tiendas.enTodas(fn);
+  if (res.length <= 1) return res[0] ? res[0].r : fn();
+  const ok = res.filter((x) => x.r.ok);
+  return {
+    ok: ok.length > 0,
+    novedad: res.some((x) => x.r.novedad),
+    urgente: res.some((x) => x.r.urgente),
+    resumen: res.map((x) => `[${x.tienda.nombre}] ${x.r.ok ? x.r.resumen : `✘ ${x.r.error}`}`).join('\n'),
+    ...(ok.length ? {} : { error: res.map((x) => `[${x.tienda.nombre}] ${x.r.error}`).join(' · ') }),
+  };
+}
+// Pedidos de todas las tiendas (para el móvil), con el nombre de su tienda.
+const pedidosTodas = async () => (await tiendas.enTodas(async () => tiendaPedidos.lista())).flatMap((x) => x.r.map((p) => ({ ...p, tienda: x.tienda.nombre, tiendaId: x.tienda.id })));
+async function enTiendaDelPedido(id, fn) {
+  const p = (await pedidosTodas()).find((x) => x.id === String(id));
+  return p ? tiendas.conTienda(p.tiendaId, fn) : fn();
+}
 const miniaturas = new Map();
 const path = require('path');
 
@@ -165,8 +186,8 @@ async function ejecutarRutina(id, { desdeWindows = false } = {}) {
   }
   const res = id === 'youtube'
     ? await youtube.ejecutar({ pensar: cerebro.pensar, crear: (destino) => creadorVideos.crear({ pensar: cerebro.pensar, destino }) })
-    : id === 'pedidos' ? await tiendaPedidos.rutina()
-    : id === 'ventas' ? await tiendaControl.informe()
+    : id === 'pedidos' ? await enCadaTienda(() => tiendaPedidos.rutina())
+    : id === 'ventas' ? await enCadaTienda(() => tiendaControl.informe())
     : id === 'clientes' ? await tiendaClientes.rutina({ pensar: cerebro.pensar })
     : await monitores.ejecutar(r, { n8nChat: (t) => (usarN8n() && r.motor === 'n8n' ? n8nChat(t) : buscarWeb(t)), manos: (t) => manosYEsperar(t, `monitor:${r.nombre}`), pensar: cerebro.pensar });
   programador.anotarEjecucion(id, res);
@@ -329,8 +350,31 @@ const ACCIONES = {
   // TIENDA (dropshipping): buscar producto → Shopify (borrador) → anuncio → Meta (en pausa).
   'tienda.estado': () => ({
     ...tiendaInvestigar.leer(),
-    conexiones: { cj: claves.tiene('CJ_API_KEY'), shopify: claves.tiene('SHOPIFY_TOKEN') && claves.tiene('SHOPIFY_TIENDA'), metaAds: claves.tiene('META_ADS_TOKEN') && claves.tiene('META_AD_ACCOUNT_ID'), pagina: claves.tiene('META_PAGE_ID') },
+    conexiones: { cj: claves.tiene('CJ_API_KEY'), shopify: tiendas.conectada(), metaAds: claves.tiene('META_ADS_TOKEN') && claves.tiene('META_AD_ACCOUNT_ID'), pagina: claves.tiene('META_PAGE_ID') },
+    tienda: tiendas.actual(),
+    tiendas: tiendas.lista().map((t) => ({ ...t, conectada: tiendas.conectada(t.id) })),
   }),
+  // Varias tiendas (con o sin dropshipping). El token va al .env, nunca se muestra.
+  'tienda.elegirTienda': (id) => tiendas.elegir(String(id || '')),
+  'tienda.agregarTienda': async (datos) => {
+    const d = datos || {};
+    const r = tiendas.agregar({ nombre: d.nombre, dominio: d.dominio, token: d.token, tipo: d.tipo });
+    if (!r.ok) return r;
+    tiendas.elegir(r.tienda.id);
+    if (!tiendas.conectada(r.tienda.id)) return { ...r, aviso: 'Tienda guardada, pero falta su token' };
+    const p = await tiendas.conTienda(r.tienda.id, () => tiendaShopify.probarTienda());
+    registro.anotar({ origen: 'tienda', accion: `añadir tienda ${r.tienda.dominio} (${r.tienda.tipo})`, decision: p.ok ? 'hecho' : 'fallo', motivo: p.error });
+    return p.ok ? { ...r, nombreShopify: p.nombre } : { ...r, aviso: `Guardada, pero Shopify no responde: ${p.error}` };
+  },
+  'tienda.quitarTienda': async (id) => {
+    const t = tiendas.lista().find((x) => x.id === String(id));
+    if (!t) return { ok: false, error: 'Esa tienda no existe' };
+    const { response } = await dialog.showMessageBox({ type: 'question', buttons: ['Quitar', 'Cancelar'], defaultId: 1, cancelId: 1, title: 'Quitar tienda', message: `¿Quitar «${t.nombre}» de Jarvis?`, detail: 'En Shopify no se borra nada. Solo se quita de Jarvis y se borra su token del PC.' });
+    if (response !== 0) return { ok: false, error: 'Cancelado' };
+    return tiendas.quitar(t.id);
+  },
+  'tienda.productoPropio': (datos) => tiendaShopify.crearPropio({ ...(datos || {}), pensar: cerebro.pensar }),
+  'tienda.pedidoEnviado': (pid, datos) => tiendaPedidos.enviadoPorMi(String(pid), datos || {}),
   'tienda.buscar': (nicho) => tiendaInvestigar.buscar({ nicho: String(nicho || '').slice(0, 80), pensar: cerebro.pensar }),
   'tienda.elegir': (pid) => tiendaInvestigar.elegir(String(pid || '')),
   // Miniatura de un producto propuesto: la ventana no carga imágenes de internet
@@ -451,9 +495,9 @@ const ACCIONES = {
 function iniciarTelegram() {
   telegram.iniciar({
     responder: (t) => ACCIONES['cerebro.responder'](String(t).slice(0, 4000), 'telegram'),
-    informe: () => tiendaControl.informe(),
-    pedidos: async () => tiendaPedidos.lista(),
-    confirmarPedido: (id) => tiendaPedidos.confirmar(id),
+    informe: () => enCadaTienda(() => tiendaControl.informe()),
+    pedidos: pedidosTodas,
+    confirmarPedido: (id) => enTiendaDelPedido(id, () => tiendaPedidos.confirmar(id)),
     revision: async () => revision.lista(),
     publicar: (nombre) => revision.publicar(nombre, [...(youtube.estado().conectado ? ['youtube'] : []), ...redesSociales.activas()]),
     descartar: async (nombre) => revision.descartar(nombre),

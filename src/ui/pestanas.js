@@ -308,7 +308,24 @@ function tarjetaProducto(p, { elegido = false } = {}) {
 const ESTADO_PEDIDO = {
   por_confirmar: ['Por confirmar', 'ambar'], problema: ['Problema', 'rojo'], creado_en_cj: ['Creado en CJ (sin pagar)', 'rojo'],
   pagado: ['Pagado en CJ · esperando envío', 'azul'], enviado: ['Enviado', 'verde'], manual: ['Hecho a mano', 'gris'],
+  por_enviar: ['Por enviar (lo envías tú)', 'ambar'],
 };
+// Tienda con stock propio: tú lo envías y pones aquí el seguimiento.
+function formEnvio(p) {
+  const d = el('div', 'td-envio');
+  const num = el('input', '', null, { type: 'text', maxlength: '60', placeholder: 'Número de seguimiento' });
+  const emp = el('input', '', null, { type: 'text', maxlength: '60', placeholder: 'Empresa: Correos, SEUR, MRW, GLS…' });
+  const url = el('input', '', null, { type: 'text', maxlength: '300', placeholder: 'Enlace de seguimiento (opcional, https://…)' });
+  const b = el('div', 'ajuste-botones');
+  b.append(boton('📦 Marcar como enviado (avisa al cliente)', (ev) => bloquear(ev, async () => {
+    const r = await api.llamar('tienda.pedidoEnviado', p.id, { numero: num.value.trim(), empresa: emp.value.trim(), url: url.value.trim() });
+    if (!r.ok) return ui.mostrarError(r.error);
+    ui.añadirMensaje('sistema', `Pedido ${p.nombre} marcado como enviado en Shopify; el cliente recibe su seguimiento.`);
+    pintarPedidos();
+  })));
+  d.append(num, emp, url, b);
+  return d;
+}
 async function pintarPedidos() {
   const lista = await api.llamar('tienda.pedidos');
   const cont = $('tdPedidos');
@@ -334,6 +351,7 @@ async function pintarPedidos() {
       b.append(boton('Ya lo hice a mano', async () => { await api.llamar('tienda.pedidoManual', p.id); pintarPedidos(); }, 'mini'));
       c.append(b);
     }
+    if (p.estado === 'por_enviar') c.append(formEnvio(p));
     return c;
   }));
 }
@@ -393,10 +411,14 @@ async function pintarTienda() {
   pintarClientes();
   const s = await api.llamar('tienda.estado');
   if (!s || s.ok === false) return;
+  pintarTiendas(s);
+  const stock = s.tienda?.tipo === 'stock';
+  $('tdBuscarCJ').classList.toggle('oculto', stock);
+  $('tdPropio').classList.toggle('oculto', !stock);
   // Conexiones que faltan.
   const faltan = [];
-  if (!s.conexiones.cj) faltan.push('CJ Dropshipping (Ajustes → Claves → Tienda → CJ_API_KEY)');
-  if (!s.conexiones.shopify) faltan.push('Shopify (Ajustes → Claves → SHOPIFY_TIENDA y SHOPIFY_TOKEN)');
+  if (!s.conexiones.cj && !stock) faltan.push('CJ Dropshipping (Ajustes → Claves → Tienda → CJ_API_KEY)');
+  if (!s.conexiones.shopify) faltan.push('Shopify (arriba: ＋ Añadir tienda, con su dirección y su token)');
   if (!s.conexiones.metaAds) faltan.push('Anuncios de Meta (META_AD_ACCOUNT_ID y reconectar Facebook en REDES con ads_management)');
   $('tdConexiones').replaceChildren(...(faltan.length ? [el('div', 'tarjeta', `Falta conectar: ${faltan.join(' · ')}`)] : []));
 
@@ -481,6 +503,58 @@ async function pintarTienda() {
   }
   paso('4 · Campaña de Meta (Facebook e Instagram)', mt);
 }
+
+// Selector de tiendas: elegir, añadir y quitar.
+function pintarTiendas(s) {
+  const cont = $('tdTiendas');
+  const fila = el('div', 'td-tiendas');
+  const lista = s.tiendas || [];
+  if (lista.length) {
+    const sel = el('select', '', null, { title: 'Tienda en uso' });
+    for (const t of lista) {
+      const o = el('option', '', `${t.nombre} · ${t.tipo === 'stock' ? 'sin dropshipping' : 'dropshipping'}${t.conectada ? '' : ' · falta token'}`, { value: t.id });
+      if (s.tienda?.id === t.id) o.selected = true;
+      sel.append(o);
+    }
+    sel.addEventListener('change', async () => { const r = await api.llamar('tienda.elegirTienda', sel.value); if (!r.ok) ui.mostrarError(r.error); pintarTienda(); });
+    fila.append(sel);
+    if (s.tienda) fila.append(el('span', 'meta', s.tienda.dominio));
+  } else {
+    fila.append(el('span', 'meta', 'Aún no hay tiendas.'));
+  }
+  fila.append(boton('＋ Añadir tienda', () => { $('formNuevaTienda').classList.remove('oculto'); $('ntNombre').focus(); }, 'mini'));
+  if (s.tienda) {
+    fila.append(boton('Quitar', async () => {
+      const r = await api.llamar('tienda.quitarTienda', s.tienda.id);
+      if (!r.ok && r.error !== 'Cancelado') ui.mostrarError(r.error);
+      pintarTienda();
+    }, 'mini'));
+  }
+  cont.replaceChildren(fila);
+}
+$('ntCancelar').addEventListener('click', () => { $('formNuevaTienda').classList.add('oculto'); $('ntToken').value = ''; });
+$('formNuevaTienda').addEventListener('submit', (e) => {
+  e.preventDefault();
+  bloquear({ target: e.target.querySelector('button') }, async () => {
+    const r = await api.llamar('tienda.agregarTienda', { nombre: $('ntNombre').value.trim(), dominio: $('ntDominio').value.trim(), token: $('ntToken').value.trim(), tipo: $('ntTipo').value });
+    $('ntToken').value = '';
+    if (!r.ok) return ui.mostrarError(r.error);
+    $('formNuevaTienda').classList.add('oculto');
+    $('ntNombre').value = ''; $('ntDominio').value = '';
+    ui.añadirMensaje('sistema', r.aviso ? `Tienda «${r.tienda.nombre}» guardada. ${r.aviso}` : `Tienda «${r.tienda.nombre}» conectada${r.nombreShopify ? ` (${r.nombreShopify})` : ''} ✔`);
+    pintarTienda();
+  });
+});
+$('formPropio').addEventListener('submit', (e) => {
+  e.preventDefault();
+  bloquear({ target: e.target.querySelector('button') }, async () => {
+    ui.añadirMensaje('sistema', 'Creando tu producto en Shopify como borrador…');
+    const r = await api.llamar('tienda.productoPropio', { nombre: $('ppNombre').value, precio: $('ppPrecio').value, coste: $('ppCoste').value, descripcion: $('ppDescripcion').value, imagenes: $('ppFotos').value, envioDias: $('ppDias').value });
+    if (!r.ok) return ui.mostrarError(r.error);
+    ui.añadirMensaje('sistema', `Producto creado como BORRADOR: «${r.titulo}». Añade fotos y stock en Shopify si hace falta, y publícalo. Luego puedes hacer su anuncio aquí abajo.`);
+    pintarTienda();
+  });
+});
 
 $('formTienda').addEventListener('submit', (e) => {
   e.preventDefault();

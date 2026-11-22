@@ -52,7 +52,7 @@ function cuentas(pedidos, productos, gasto) {
  * Informe de hoy y de 7 días. Devuelve { ok, novedad, resumen, hoy, semana, proponerPausa }.
  */
 async function informe({ dep = {} } = {}) {
-  const shopifyOk = Boolean(claves.obtener('SHOPIFY_TOKEN') && claves.obtener('SHOPIFY_TIENDA'));
+  const shopifyOk = require('./tiendas').conectada();
   if (!shopifyOk) return { ok: true, novedad: false, resumen: 'Shopify no está conectado' };
   try {
     const estado = investigar.leer();

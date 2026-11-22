@@ -89,7 +89,7 @@ async function crearAnuncio({ pensar, dep = {} } = {}) {
       ...g.escenas.map((e, i) => ({ svg: svgEscena({ foto: foto(i + 1), texto: e.pantalla }), texto: e.narracion })),
       { svg: svgEscena({ foto: foto(0), texto: titulo.slice(0, 40), abajo: `${g.cta} · ${euros(p.precioVenta)}` }), texto: `${g.cta}. Por ${euros(p.precioVenta)}.` },
     ];
-    const carpeta = rutas.asegurar(rutas.datos('dropshipping', slug(p.nombre)));
+    const carpeta = rutas.asegurar(path.join(require('./tiendas').carpeta(), slug(p.nombre)));
     const creador = require('../youtube/creador');
     const textos = { titular: g.titular, textos: g.textos, cta: g.cta, producto: titulo, precio: p.precioVenta };
     const video = await creador.montar({ lista, nombre: 'anuncio', carpeta, meta: textos, tam: { ancho: V, alto: VH }, dep });

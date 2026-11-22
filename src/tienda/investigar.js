@@ -12,9 +12,10 @@ const { pedir } = require('../nucleo/http');
 const registro = require('../seguridad/registro');
 const cj = require('./cj');
 
-const archivo = () => rutas.datos('dropshipping', 'estado.json');
+// Cada tienda tiene su propio estado (la principal, la carpeta de siempre).
+const archivo = () => require('path').join(require('./tiendas').carpeta(), 'estado.json');
 function leer() { try { return JSON.parse(fs.readFileSync(archivo(), 'utf8')); } catch (_) { return {}; } }
-function escribir(d) { rutas.asegurar(rutas.datos('dropshipping')); fs.writeFileSync(archivo(), JSON.stringify(d, null, 2)); return d; }
+function escribir(d) { fs.writeFileSync(archivo(), JSON.stringify(d, null, 2)); return d; }
 
 async function cambioUSD() {
   const r = await pedir('https://api.frankfurter.dev/v1/latest?base=USD&symbols=EUR', {}, 15).catch(() => null);

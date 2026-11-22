@@ -201,6 +201,9 @@ button.mini { padding: 3px 8px !important; font-size: 11px !important; }
 /* Pestaña TIENDA */
 #formTienda input, .td-paso input { width: 100%; box-sizing: border-box; background: #000; color: var(--texto); border: 1px solid var(--led-suave); border-radius: 6px; padding: 7px; font: inherit; font-size: 12px; }
 #formTienda .ajuste-botones { margin-top: 8px; }
+.td-form input, .td-form select, .td-form textarea, .td-envio input { width: 100%; box-sizing: border-box; background: #000; color: var(--texto); border: 1px solid var(--led-suave); border-radius: 6px; padding: 7px; font: inherit; font-size: 12px; margin-bottom: 6px; }
+.td-tiendas { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 8px; }
+.td-tiendas select { background: #000; color: var(--texto); border: 1px solid var(--led-suave); border-radius: 6px; padding: 6px; font: inherit; font-size: 12px; }
 .td-producto { display: flex; gap: 10px; }
 .td-producto img { width: 84px; height: 84px; object-fit: cover; border-radius: 6px; background: #fff; flex-shrink: 0; }
 .td-producto .cifras { font-size: 12px; margin-top: 4px; }

@@ -133,14 +133,37 @@
       </div>
 
       <div class="contenido-pestana oculto" id="pestana-tienda">
-        <p class="nota">Dropshipping en España con tu tienda de Shopify y CJ Dropshipping. Tú apruebas cada paso; los anuncios se crean en pausa y no gastan nada hasta que pulses Activar.</p>
-        <div class="lista" id="tdConexiones"></div>
-        <h3 class="titulo-seccion">1 · Buscar productos</h3>
-        <form id="formTienda" autocomplete="off">
-          <input id="tdNicho" type="text" dir="auto" placeholder="Nicho (opcional): p. ej. cocina, mascotas, coche…">
-          <div class="ajuste-botones"><button type="submit">🔎 Buscar productos</button></div>
+        <p class="nota">Tus tiendas de Shopify en España, con dropshipping (CJ) o con tu propio stock. Tú apruebas cada paso; los anuncios se crean en pausa y no gastan nada hasta que pulses Activar.</p>
+        <h3 class="titulo-seccion">Mis tiendas</h3>
+        <div id="tdTiendas"></div>
+        <form id="formNuevaTienda" class="td-form oculto" autocomplete="off">
+          <input id="ntNombre" type="text" dir="auto" maxlength="40" placeholder="Nombre (para ti): p. ej. Tienda mascotas">
+          <input id="ntDominio" type="text" maxlength="80" placeholder="Dirección: mitienda.myshopify.com">
+          <input id="ntToken" type="password" maxlength="200" placeholder="Token de la app de Shopify (shpat_…)">
+          <select id="ntTipo"><option value="dropshipping">Con dropshipping (productos de CJ)</option><option value="stock">Sin dropshipping (mis productos, los envío yo)</option></select>
+          <div class="ajuste-botones"><button type="submit">Guardar tienda</button><button type="button" id="ntCancelar">Cancelar</button></div>
         </form>
-        <div class="lista" id="tdPropuestas"></div>
+        <div class="lista" id="tdConexiones"></div>
+        <div id="tdBuscarCJ">
+          <h3 class="titulo-seccion">1 · Buscar productos</h3>
+          <form id="formTienda" autocomplete="off">
+            <input id="tdNicho" type="text" dir="auto" placeholder="Nicho (opcional): p. ej. cocina, mascotas, coche…">
+            <div class="ajuste-botones"><button type="submit">🔎 Buscar productos</button></div>
+          </form>
+          <div class="lista" id="tdPropuestas"></div>
+        </div>
+        <div id="tdPropio" class="oculto">
+          <h3 class="titulo-seccion">1 · Tu producto</h3>
+          <form id="formPropio" class="td-form" autocomplete="off">
+            <input id="ppNombre" type="text" dir="auto" maxlength="120" placeholder="Nombre del producto">
+            <input id="ppPrecio" type="text" maxlength="10" placeholder="Precio de venta en € (IVA incluido): p. ej. 24,95">
+            <input id="ppCoste" type="text" maxlength="10" placeholder="Lo que te cuesta a ti cada uno, en € (para calcular tu beneficio)">
+            <textarea id="ppDescripcion" dir="auto" rows="3" maxlength="3000" placeholder="Qué es, materiales, medidas… (Jarvis escribe la ficha con esto, sin inventar)"></textarea>
+            <input id="ppFotos" type="text" maxlength="2000" placeholder="Enlaces de fotos (https://…), separados por espacios (opcional)">
+            <input id="ppDias" type="text" maxlength="10" value="1-3" placeholder="Días de envío">
+            <div class="ajuste-botones"><button type="submit">🛍️ Crear en Shopify (borrador)</button></div>
+          </form>
+        </div>
         <div id="tdPasos"></div>
         <h3 class="titulo-seccion">Pedidos</h3>
         <p class="nota">Cada 30 minutos Jarvis mira tus pedidos de Shopify y te avisa. Comprarlos en CJ gasta tu saldo de CJ: siempre te lo pregunta. El seguimiento se pone solo en Shopify.</p>

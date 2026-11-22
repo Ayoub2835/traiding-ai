@@ -25,8 +25,17 @@ function guardarCliente(uid, datos) {
 
 /** Pedido del cliente en Shopify (por su email), con su seguimiento si lo hay. */
 async function pedidoDe(email, graphql) {
-  if (!email || !claves.obtener('SHOPIFY_TOKEN')) return null;
-  const g = graphql || require('./shopify').graphql;
+  if (!email) return null;
+  // Un solo Gmail para todas las tiendas: se busca el pedido en cada una.
+  if (!graphql) {
+    const tiendas = require('./tiendas');
+    for (const t of tiendas.lista().filter((x) => tiendas.conectada(x.id))) {
+      const p = await tiendas.conTienda(t.id, () => pedidoDe(email, require('./shopify').graphql)).catch(() => null);
+      if (p) return { ...p, tienda: t.nombre };
+    }
+    return null;
+  }
+  const g = graphql;
   const limpio = String(email).replace(/["\\\s]/g, '');
   const d = await g(`query($q: String!) { orders(first: 3, query: $q, sortKey: CREATED_AT, reverse: true) { nodes { id name createdAt displayFinancialStatus displayFulfillmentStatus fulfillments(first: 3) { trackingInfo(first: 1) { number url company } } } } }`, { q: `email:"${limpio}"` });
   const o = d.orders?.nodes?.[0];

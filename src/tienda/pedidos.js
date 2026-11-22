@@ -7,7 +7,6 @@
 //  3. seguimiento(): cuando CJ da el número de seguimiento, lo pone en Shopify
 //     (pedido "enviado") y Shopify avisa al cliente. Esto no gasta dinero.
 'use strict';
-const claves = require('../nucleo/claves');
 const registro = require('../seguridad/registro');
 const investigar = require('./investigar');
 const cj = require('./cj');
@@ -25,7 +24,8 @@ const ORDERS = `query($q: String!) {
   }
 }`;
 
-const conectado = () => Boolean(claves.obtener('SHOPIFY_TOKEN') && claves.obtener('SHOPIFY_TIENDA'));
+const conectado = () => require('./tiendas').conectada();
+const esStock = () => require('./tiendas').actual()?.tipo === 'stock';
 
 function guardarPedido(id, datos) {
   const e = investigar.leer();
@@ -47,6 +47,15 @@ async function revisar({ dep = {} } = {}) {
     if (conocidos[o.id]) continue;
     const dir = o.shippingAddress;
     const lineas = (o.lineItems?.nodes || []).map((l) => ({ id: l.id, titulo: l.title, cantidad: l.quantity, cj: productos[l.product?.id] || null }));
+    // Tienda con stock propio: lo envías tú; Jarvis solo avisa y luego pone tu seguimiento.
+    if (esStock()) {
+      nuevos.push(guardarPedido(o.id, {
+        id: o.id, nombre: o.name, fecha: o.createdAt, total: `${o.totalPriceSet?.shopMoney?.amount} ${o.totalPriceSet?.shopMoney?.currencyCode}`,
+        cliente: dir ? dir.name || `${dir.firstName || ''} ${dir.lastName || ''}`.trim() : '', ciudad: dir ? `${dir.city}, ${dir.country}` : '',
+        lineas, envio: null, costeEstimadoEUR: 0, estado: 'por_enviar', problema: '',
+      }));
+      continue;
+    }
     const sinCj = lineas.filter((l) => !l.cj);
     let envio = null;
     let problema = '';
@@ -137,6 +146,31 @@ async function seguimiento({ dep = {} } = {}) {
   return { ok: true, enviados };
 }
 
+/** Stock propio: tú lo envías y pones aquí el seguimiento; Jarvis lo pasa a Shopify. */
+async function enviadoPorMi(id, { numero, empresa = '', url = '' } = {}, { dep = {} } = {}) {
+  const p = (investigar.leer().pedidos || {})[id];
+  if (!p) return { ok: false, error: 'No encuentro ese pedido' };
+  const n = String(numero || '').trim().slice(0, 60);
+  if (!n) return { ok: false, error: 'Escribe el número de seguimiento' };
+  try {
+    const g = dep.graphql || shopify().graphql;
+    const fo = await g(`query($id: ID!) { order(id: $id) { fulfillmentOrders(first: 5) { nodes { id status } } } }`, { id });
+    const abiertos = (fo.order?.fulfillmentOrders?.nodes || []).filter((f) => ['OPEN', 'IN_PROGRESS', 'SCHEDULED'].includes(f.status));
+    if (!abiertos.length) return { ok: false, error: 'Ese pedido ya está marcado como enviado en Shopify' };
+    const u = String(url || '').trim();
+    const r = await g(`mutation($f: FulfillmentInput!) { fulfillmentCreate(fulfillment: $f) { fulfillment { id status } userErrors { field message } } }`, {
+      f: { lineItemsByFulfillmentOrder: abiertos.map((f) => ({ fulfillmentOrderId: f.id })), trackingInfo: { number: n, company: String(empresa || 'Otro').slice(0, 60), ...(/^https:\/\//.test(u) ? { url: u } : {}) }, notifyCustomer: true },
+    });
+    const err = r.fulfillmentCreate?.userErrors || [];
+    if (err.length) return { ok: false, error: err.map((x) => x.message).join('; ') };
+    guardarPedido(id, { estado: 'enviado', seguimiento: n, transportista: empresa });
+    registro.anotar({ origen: 'pedidos', accion: `marcar como enviado ${p.nombre} (seguimiento ${n})`, decision: 'hecho por el usuario' });
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e.message };
+  }
+}
+
 /** Lo que ejecuta la rutina cada 30 minutos (no gasta dinero). */
 async function rutina({ dep = {} } = {}) {
   if (!conectado()) return { ok: true, novedad: false, resumen: 'Shopify no está conectado' };
@@ -146,6 +180,8 @@ async function rutina({ dep = {} } = {}) {
     const partes = [];
     const porConfirmar = r.nuevos.filter((n) => n.estado === 'por_confirmar');
     const problemas = r.nuevos.filter((n) => n.estado === 'problema');
+    const porEnviar = r.nuevos.filter((n) => n.estado === 'por_enviar');
+    if (porEnviar.length) partes.push(`📦 ${porEnviar.length} pedido(s) nuevo(s) para ENVIAR tú: ${porEnviar.map((n) => `${n.nombre} (${n.total})`).join(', ')}`);
     if (porConfirmar.length) partes.push(`🛒 ${porConfirmar.length} pedido(s) nuevo(s) para confirmar en TIENDA: ${porConfirmar.map((n) => `${n.nombre} (${n.total})`).join(', ')}`);
     if (problemas.length) partes.push(`⚠ ${problemas.map((n) => `${n.nombre}: ${n.problema}`).join(' · ')}`);
     if (s.enviados.length) partes.push(`📦 Enviado(s) con seguimiento: ${s.enviados.map((x) => `${x.nombre} (${x.seguimiento})`).join(', ')}`);
@@ -167,4 +203,4 @@ function marcarManual(id) {
   return { ok: true };
 }
 
-module.exports = { revisar, confirmar, seguimiento, rutina, lista, marcarManual, cuerpoCJ };
+module.exports = { revisar, confirmar, seguimiento, rutina, lista, marcarManual, enviadoPorMi, cuerpoCJ };

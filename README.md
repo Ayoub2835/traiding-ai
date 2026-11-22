@@ -156,6 +156,11 @@ Y además, en automático:
 
 Permisos de la app de Shopify: `write_products`, `read_products`, `read_orders`, `write_merchant_managed_fulfillment_orders`.
 
+**Varias tiendas, con o sin dropshipping** (TIENDA → Mis tiendas → ＋ Añadir tienda): nombre, dirección `mitienda.myshopify.com`, token de su app y tipo.
+- *Con dropshipping*: todo lo de arriba (CJ).
+- *Sin dropshipping* (tu stock): en vez de buscar en CJ, escribes tu producto (nombre, precio, coste, descripción, fotos) y Jarvis hace la ficha y el anuncio. Los pedidos quedan *Por enviar*: lo envías tú, escribes el número de seguimiento y Jarvis lo pone en Shopify (el cliente recibe el aviso).
+- Cada tienda tiene sus propios datos y su token (en el `.env`, como `SHOPIFY_TOKEN_<ID>`). La tienda que ya tenías es la *Principal*. Las rutinas de pedidos y ventas recorren todas las tiendas y el aviso indica de cuál es cada cosa; los correos de clientes buscan el pedido en todas.
+
 ### Jarvis en el móvil (Telegram)
 
 1. En Telegram, habla con **@BotFather** → `/newbot` y copia el token.

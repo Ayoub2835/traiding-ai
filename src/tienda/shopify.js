@@ -8,18 +8,24 @@ const registro = require('../seguridad/registro');
 const investigar = require('./investigar');
 
 const VERSION = '2026-10';
+// Tienda en uso (pestaña TIENDA, o la que recorre una rutina).
 const url = () => {
-  const tienda = String(claves.obtener('SHOPIFY_TIENDA') || '').replace(/^https?:\/\//, '').replace(/\/.*$/, '');
-  if (!tienda || !claves.obtener('SHOPIFY_TOKEN')) throw new Error('Falta conectar Shopify (Ajustes → Claves → SHOPIFY_TIENDA y SHOPIFY_TOKEN)');
-  return { tienda, api: process.env.JARVIS_SHOPIFY_BASE ? `${process.env.JARVIS_SHOPIFY_BASE}/admin/api/${VERSION}/graphql.json` : `https://${tienda}/admin/api/${VERSION}/graphql.json` };
+  const { dominio: tienda, token } = require('./tiendas').credenciales();
+  if (!tienda || !token) throw new Error('Falta conectar esta tienda de Shopify (TIENDA → ＋ Añadir tienda, o Ajustes → Claves → SHOPIFY_TIENDA y SHOPIFY_TOKEN)');
+  return { tienda, token, api: process.env.JARVIS_SHOPIFY_BASE ? `${process.env.JARVIS_SHOPIFY_BASE}/admin/api/${VERSION}/graphql.json` : `https://${tienda}/admin/api/${VERSION}/graphql.json` };
 };
 
 async function graphql(query, variables) {
-  const { api } = url();
-  const r = await pedir(api, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Shopify-Access-Token': claves.obtener('SHOPIFY_TOKEN') }, body: JSON.stringify({ query, variables }) }, 60);
+  const { api, token } = url();
+  const r = await pedir(api, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Shopify-Access-Token': token }, body: JSON.stringify({ query, variables }) }, 60);
   if (!r.ok) throw new Error(`Shopify: ${r.error}`);
   if (r.datos?.errors?.length) throw new Error(`Shopify: ${r.datos.errors.map((e) => e.message).join('; ')}`);
   return r.datos.data;
+}
+
+/** Comprueba que el token de la tienda en uso funciona (nombre de la tienda). */
+async function probarTienda() {
+  try { const d = await graphql('{ shop { name myshopifyDomain } }'); return { ok: true, nombre: d.shop?.name, dominio: d.shop?.myshopifyDomain }; } catch (e) { return { ok: false, error: e.message }; }
 }
 
 const esc = (t) => String(t || '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -94,6 +100,22 @@ async function crearProducto({ pensar } = {}) {
   }
 }
 
+/**
+ * Tienda SIN dropshipping: tu propio producto (lo envías tú). Queda como el
+ * producto elegido (para hacer su anuncio) y se crea en Shopify como borrador.
+ */
+async function crearPropio({ nombre, precio, coste = 0, descripcion = '', imagenes = [], envioDias = '1-3', pensar } = {}) {
+  const n = String(nombre || '').trim().slice(0, 120);
+  const pr = Number(String(precio).replace(',', '.'));
+  if (!n) return { ok: false, error: 'Escribe el nombre del producto' };
+  if (!(pr > 0 && pr < 100000)) return { ok: false, error: 'Escribe un precio válido (en euros)' };
+  const fotos = (Array.isArray(imagenes) ? imagenes : String(imagenes).split(/\s+/)).map((u) => String(u).trim()).filter((u) => /^https:\/\/\S+$/.test(u)).slice(0, 8);
+  const estado = investigar.leer();
+  const elegido = { pid: `propio-${Date.now()}`, vid: null, propio: true, nombre: n, imagenes: fotos, imagen: fotos[0] || '', descripcionProveedor: String(descripcion).slice(0, 3000), categoria: '', busqueda: '', precioVenta: +pr.toFixed(2), costeEUR: Math.max(0, Number(String(coste).replace(',', '.')) || 0), envioEUR: 0, envioDias: String(envioDias).slice(0, 10) };
+  investigar.escribir({ ...estado, elegido, shopify: null, anuncio: null, meta: null });
+  return crearProducto({ pensar });
+}
+
 /** ¿Está publicado en la tienda online? Devuelve la URL pública si lo está. */
 async function estadoProducto() {
   const s = investigar.leer().shopify;
@@ -104,4 +126,4 @@ async function estadoProducto() {
   return { ok: true, estado: p.status, publicado: p.status === 'ACTIVE' && Boolean(p.onlineStoreUrl), url: p.onlineStoreUrl || s.tiendaUrl };
 }
 
-module.exports = { crearProducto, estadoProducto, textos, graphql, VERSION };
+module.exports = { crearProducto, crearPropio, estadoProducto, textos, graphql, probarTienda, VERSION };
