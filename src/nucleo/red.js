@@ -22,7 +22,20 @@ function hostsPermitidos(cfg) {
   if (claves.tiene('SHOPIFY_TIENDA')) add(`https://${claves.obtener('SHOPIFY_TIENDA')}`);
   for (const u of (cfg && cfg.noticias) || []) add(u.url || u);
   add('https://news.google.com'); // búsqueda gratis de las rutinas (Google News RSS)
+  // Vídeos y tienda: datos públicos sin clave (precios cripto, miedo/codicia, cambio €).
+  add('https://api.coingecko.com');
+  add('https://api.alternative.me');
+  add('https://api.frankfurter.dev');
+  if (claves.tiene('CJ_API_KEY')) add('https://developers.cjdropshipping.com');
+  if (claves.tiene('TELEGRAM_BOT_TOKEN')) add('https://api.telegram.org');
+  if (claves.tiene('META_PAGE_TOKEN') || claves.tiene('META_ADS_TOKEN') || claves.tiene('META_USER_TOKEN')) add('https://graph.facebook.com');
   return h;
+}
+
+// Dominios con muchos subdominios (las fotos de CJ vienen de varios CDN suyos).
+function porSufijo(hostName) {
+  if (!claves.tiene('CJ_API_KEY')) return false;
+  return ['cjdropshipping.com', 'alicdn.com'].some((d) => hostName === d || hostName.endsWith(`.${d}`));
 }
 
 // Ollama local: se permite http solo hacia este mismo PC.
@@ -35,7 +48,7 @@ function permitida(urlTexto, cfg) {
   try { u = new URL(urlTexto); } catch (_) { return false; }
   if (['jarvis:', 'file:', 'data:', 'blob:', 'devtools:', 'chrome-extension:'].includes(u.protocol)) return true;
   if ((u.protocol === 'http:' || u.protocol === 'ws:') && esLocal(u)) return true;
-  if (u.protocol === 'https:' || u.protocol === 'wss:') return hostsPermitidos(cfg).has(u.host);
+  if (u.protocol === 'https:' || u.protocol === 'wss:') return hostsPermitidos(cfg).has(u.host) || (u.protocol === 'https:' && porSufijo(u.hostname));
   return false;
 }
 
