@@ -95,6 +95,13 @@
       </div>
 
       <div class="contenido-pestana oculto" id="pestana-rutinas">
+        <h3 class="titulo-seccion">Recordatorios</h3>
+        <form id="formRecordar" class="td-form" autocomplete="off">
+          <input id="recFrase" type="text" dir="auto" maxlength="400" placeholder="mañana 10:00 llamar al proveedor · en 30 min … · 25/11 18:30 … · … cada día">
+          <div class="ajuste-botones"><button type="submit">⏰ Recordármelo</button></div>
+        </form>
+        <div class="lista" id="listaRecordatorios"></div>
+        <h3 class="titulo-seccion">Rutinas</h3>
         <details class="nueva-rutina">
           <summary>＋ Nueva rutina</summary>
           <form id="formMonitor" autocomplete="off">
@@ -118,6 +125,9 @@
       <div class="contenido-pestana oculto" id="pestana-redes">
         <h3 class="titulo-seccion">Cuentas</h3>
         <div class="lista" id="redCuentas"></div>
+        <h3 class="titulo-seccion">Ideas de vídeos para hoy</h3>
+        <div class="ajuste-botones"><button type="button" id="btnIdeas">💡 Dame ideas con las noticias de hoy</button></div>
+        <div class="lista" id="listaIdeas"></div>
         <h3 class="titulo-seccion">Crear vídeo</h3>
         <form id="formVideo" autocomplete="off">
           <textarea id="temaVideo" dir="auto" rows="3" placeholder="¿De qué quieres el vídeo? (p. ej. «5 errores de los novatos en trading», «historia de Bitcoin en 1 minuto»)"></textarea>
@@ -198,6 +208,9 @@
       </div>
 
       <div class="contenido-pestana oculto" id="pestana-ajustes">
+        <h3 class="titulo-seccion" id="configTitulo">Configurar Jarvis</h3>
+        <p class="nota">Lo que falta por conectar, uno a uno. Pulsa en cada uno para ver los pasos.</p>
+        <div class="lista" id="configPasos"></div>
         <label class="ajuste">Color de las luces
           <input type="color" id="ajColor">
         </label>

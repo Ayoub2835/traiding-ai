@@ -169,6 +169,12 @@ Para vender más:
 - *Sin dropshipping* (tu stock): en vez de buscar en CJ, escribes tu producto (nombre, precio, coste, descripción, fotos) y Jarvis hace la ficha y el anuncio. Los pedidos quedan *Por enviar*: lo envías tú, escribes el número de seguimiento y Jarvis lo pone en Shopify (el cliente recibe el aviso).
 - Cada tienda tiene sus propios datos y su token (en el `.env`, como `SHOPIFY_TOKEN_<ID>`). La tienda que ya tenías es la *Principal*. Las rutinas de pedidos y ventas recorren todas las tiendas y el aviso indica de cuál es cada cosa; los correos de clientes buscan el pedido en todas.
 
+### Configurar Jarvis, recordatorios e ideas de vídeo
+
+- **AJUSTES → Configurar Jarvis**: lista de todo lo que se puede conectar (cerebro, avisos, CJ, Shopify, Gmail, Facebook/Instagram, anuncios, píxel, YouTube, TikTok, Telegram) con ✅/❌ y los pasos de cada uno.
+- **Recordatorios** (RUTINAS): «mañana 10:00 llamar al proveedor», «en 30 min …», «25/11 18:30 …», «… cada día». También diciéndole a Jarvis «recuérdame …» o con `/recordar` y `/agenda` en Telegram. Avisa en el PC y en el móvil.
+- **Ideas de vídeos** (REDES, y la rutina de las 10:00): 5 ideas con las noticias de hoy sobre tus temas (`VIDEOS_TEMAS`); un botón y Jarvis crea el vídeo en «Por revisar».
+
 ### Jarvis en el móvil (Telegram)
 
 1. En Telegram, habla con **@BotFather** → `/newbot` y copia el token.

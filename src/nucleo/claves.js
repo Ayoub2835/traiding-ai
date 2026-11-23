@@ -64,6 +64,7 @@ const CATALOGO = [
   { clave: 'TIKTOK_PRIVACIDAD', grupo: 'Redes sociales', etiqueta: 'TikTok: visibilidad (PUBLIC_TO_EVERYONE / SELF_ONLY)', defecto: 'PUBLIC_TO_EVERYONE', ayuda: 'Hasta que TikTok audite tu app, sus vídeos quedan en privado aunque pongas público.' },
   { clave: 'YOUTUBE_REVISAR', grupo: 'YouTube', etiqueta: 'Revisar los vídeos antes de publicar (si/no)', defecto: 'si', ayuda: 'Con "si", el vídeo del día queda en REDES → Por revisar y solo se publica cuando pulses Publicar.' },
   { clave: 'YOUTUBE_CREAR', grupo: 'YouTube', etiqueta: 'Crear el vídeo solo si la cola está vacía (si/no)', defecto: 'si', ayuda: 'Jarvis crea gratis un resumen cripto narrado (precios reales, noticias y voz) y lo sube.' },
+  { clave: 'VIDEOS_TEMAS', grupo: 'YouTube', etiqueta: 'Temas de las ideas de vídeo (separados por comas)', defecto: 'bitcoin, criptomonedas, trading' },
   { clave: 'YOUTUBE_CANAL_NOMBRE', grupo: 'YouTube', etiqueta: 'Nombre del canal (sale en los vídeos)', defecto: 'Cripto al día' },
   { clave: 'FFMPEG_RUTA', grupo: 'Avanzado', etiqueta: 'Ruta de ffmpeg (opcional)', ayuda: 'Normalmente no hace falta: Jarvis trae su propio ffmpeg.' },
   { clave: 'YOUTUBE_PRIVACIDAD', grupo: 'YouTube', etiqueta: 'Visibilidad por defecto (public/unlisted/private)', defecto: 'public', ayuda: 'Hasta que Google audite tu proyecto, YouTube deja PRIVADOS los vídeos subidos por API.' },

@@ -46,6 +46,23 @@ const tiendas = require('./tienda/tiendas');
 const tiendaEspia = require('./tienda/espia');
 const tiendaPaginas = require('./tienda/paginas');
 const tiendaManana = require('./tienda/manana');
+const agenda = require('./agenda');
+const ideasVideos = require('./redes/ideas');
+const configuracion = require('./nucleo/configuracion');
+
+// Agenda: cada 30 s mira si toca algún recordatorio y avisa en el PC y en el móvil.
+async function revisarAgenda() {
+  for (const r of agenda.vencidos()) {
+    if (Notification.isSupported()) new Notification({ title: '⏰ Recordatorio', body: r.texto, icon: ctx.icono }).show();
+    enviar('recordatorio', r);
+    await avisos.avisar({ titulo: '⏰ Recordatorio', mensaje: r.texto }).catch(() => {});
+  }
+}
+const recordarFrase = (frase) => {
+  const x = agenda.interpretar(frase);
+  if (!x) return { ok: false, error: 'No entiendo la fecha. Ejemplos: «mañana 10:00 llamar al proveedor», «en 30 min sacar la ropa», «25/11 18:30 dentista», «hoy 21:00 revisar ventas cada día»' };
+  return agenda.agregar(x);
+};
 
 // Rutinas de tienda: con varias tiendas, se hace en cada una y se junta el aviso.
 async function enCadaTienda(fn) {
@@ -193,6 +210,7 @@ async function ejecutarRutina(id, { desdeWindows = false } = {}) {
     : id === 'ventas' ? await enCadaTienda(() => tiendaControl.informe())
     : id === 'clientes' ? await tiendaClientes.rutina({ pensar: cerebro.pensar })
     : id === 'negocio' ? await tiendaManana.resumen()
+    : id === 'ideas' ? await ideasVideos.generar({ pensar: cerebro.pensar })
     : await monitores.ejecutar(r, { n8nChat: (t) => (usarN8n() && r.motor === 'n8n' ? n8nChat(t) : buscarWeb(t)), manos: (t) => manosYEsperar(t, `monitor:${r.nombre}`), pensar: cerebro.pensar });
   programador.anotarEjecucion(id, res);
   if (res.ok && res.novedad) {
@@ -271,6 +289,12 @@ async function estadoServicios() {
 const ACCIONES = {
   // Cerebro
   'cerebro.responder': async (texto, origen = 'texto') => {
+    // «Recuérdame mañana 10:00 …»: va directo a la agenda.
+    const rec = String(texto || '').trim().match(/^recu[eé]rdame\s+(?:que\s+)?(.+)$/i);
+    if (rec && agenda.interpretar(rec[1])) {
+      const r = recordarFrase(rec[1]);
+      return r.ok ? { ok: true, texto: `Hecho. Te lo recordaré el ${new Date(r.recordatorio.cuando).toLocaleString('es-ES', { weekday: 'long', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })}.` } : { ok: false, error: r.error };
+    }
     const r = await cerebro.responder(String(texto || '').slice(0, 6000), { origen, alProgreso: (p) => enviar('progreso', p) });
     // Cada 6 mensajes, extrae hechos duraderos en segundo plano (modelo local si hay).
     if (++mensajesDesdeExtraccion >= 6) {
@@ -408,6 +432,16 @@ const ACCIONES = {
     return tiendaPaginas.aplicar();
   },
   'tienda.comprobar': () => tiendaPaginas.comprobar().catch((e) => ({ ok: false, error: e.message })),
+  // Configurar Jarvis: qué falta por conectar y cómo.
+  'config.pasos': () => configuracion.pasos(),
+  // Agenda y recordatorios.
+  'agenda.lista': () => agenda.lista(),
+  'agenda.agregar': (datos) => agenda.agregar(datos || {}),
+  'agenda.frase': (frase) => recordarFrase(String(frase || '').slice(0, 400)),
+  'agenda.quitar': (id) => agenda.quitar(String(id || '')),
+  // Ideas de vídeos del día.
+  'ideas.lista': () => ideasVideos.leer(),
+  'ideas.generar': () => ideasVideos.generar({ pensar: cerebro.pensar }),
   'tienda.productoPropio': (datos) => tiendaShopify.crearPropio({ ...(datos || {}), pensar: cerebro.pensar }),
   'tienda.pedidoEnviado': (pid, datos) => tiendaPedidos.enviadoPorMi(String(pid), datos || {}),
   'tienda.buscar': (nicho) => tiendaInvestigar.buscar({ nicho: String(nicho || '').slice(0, 80), pensar: cerebro.pensar }),
@@ -536,6 +570,8 @@ function iniciarTelegram() {
     revision: async () => revision.lista(),
     publicar: (nombre) => revision.publicar(nombre, [...(youtube.estado().conectado ? ['youtube'] : []), ...redesSociales.activas()]),
     descartar: async (nombre) => revision.descartar(nombre),
+    recordar: async (frase) => recordarFrase(frase),
+    agenda: async () => agenda.lista(),
   }).catch((e) => registro.anotar({ origen: 'telegram', accion: 'iniciar bot', decision: 'fallo', motivo: e.message }));
 }
 
@@ -573,6 +609,7 @@ function iniciar(contexto) {
   confirmacion.eventos.on('resuelta', (p) => enviar('confirmacion_resuelta', p));
   programador.iniciar((id) => ejecutarRutina(id));
   iniciarTelegram();
+  setInterval(() => { revisarAgenda().catch(() => {}); }, 30000);
   // Si Ollama no está abierto, se abre solo para que el modelo local funcione.
   // Memoria de n8n: se importa sola si importado-n8n.json está en la carpeta del
   // proyecto, en Documentos\Jarvis o en Descargas (sin duplicar).

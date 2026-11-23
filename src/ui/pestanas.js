@@ -98,6 +98,7 @@ async function pintarHabilidades() {
 // ---------------------------------------------------------------------------
 const textoHorario = (h) => (h.tipo === 'diario' ? `cada día a las ${h.hora}` : `cada ${h.minutos} min`);
 async function pintarRutinas(lista) {
+  pintarRecordatorios();
   lista = lista || await api.llamar('rutinas.listar');
   const cont = $('listaRutinas');
   cont.replaceChildren(...lista.map((r) => {
@@ -125,7 +126,7 @@ async function pintarRutinas(lista) {
     }));
     if (r.id === 'youtube') pintarYoutube(c, r, botones);
     // Las rutinas fijas no se pueden quitar (solo activar/desactivar).
-    if (!['resumen', 'informe', 'caza', 'youtube', 'pedidos', 'ventas', 'clientes', 'negocio'].includes(r.id)) botones.append(boton('Quitar', async () => { await api.llamar('rutinas.quitar', r.id); }, 'peligro'));
+    if (!['resumen', 'informe', 'caza', 'youtube', 'pedidos', 'ventas', 'clientes', 'negocio', 'ideas'].includes(r.id)) botones.append(boton('Quitar', async () => { await api.llamar('rutinas.quitar', r.id); }, 'peligro'));
     c.append(botones);
     return c;
   }));
@@ -263,7 +264,7 @@ async function pintarRevisar() {
   }));
 }
 
-function pintarRedes() { pintarCuentas(); pintarRevisar(); }
+function pintarRedes() { pintarCuentas(); pintarRevisar(); pintarIdeas(); }
 
 async function crearVideo(accion, args, aviso) {
   const botones = [...document.querySelectorAll('#formVideo button')];
@@ -715,7 +716,70 @@ $('btnClaves').addEventListener('click', abrirClaves);
 $('clGuardar').addEventListener('click', async () => { await guardarClaves(); abrirClaves(); });
 $('clCerrar').addEventListener('click', () => $('capaClaves').classList.add('oculto'));
 
+// Configurar Jarvis: cada conexión con ✅/❌ y sus pasos.
+async function pintarConfig() {
+  const c = await api.llamar('config.pasos');
+  if (!c?.pasos) return;
+  $('configTitulo').textContent = `Configurar Jarvis (${c.listos} de ${c.total} listos)`;
+  $('configPasos').replaceChildren(...c.pasos.map((x) => {
+    const d = el('details', 'tarjeta');
+    d.append(el('summary', '', `${x.ok ? '✅' : '❌'} ${x.nombre} — ${x.para}`));
+    const ol = el('ol');
+    for (const p of x.como) ol.append(el('li', '', p));
+    d.append(ol);
+    return d;
+  }));
+}
+
+// Recordatorios
+async function pintarRecordatorios() {
+  const l = await api.llamar('agenda.lista');
+  const cont = $('listaRecordatorios');
+  if (!Array.isArray(l) || !l.length) return vacio(cont, 'Sin recordatorios. También puedes decirle a Jarvis «recuérdame mañana 10:00 …» o escribir /recordar en Telegram.');
+  cont.replaceChildren(...l.map((r) => {
+    const c = el('div', 'tarjeta');
+    const cab = el('div', 'tarea-cab');
+    cab.append(el('span', 'chip azul', hora(r.cuando)), el('span', '', ` ${r.texto}`, { dir: 'auto' }), ...(r.repetir !== 'no' ? [el('span', 'meta', ` · ${r.repetir}`)] : []));
+    c.append(cab, boton('Quitar', async () => { await api.llamar('agenda.quitar', r.id); pintarRecordatorios(); }, 'mini'));
+    return c;
+  }));
+}
+$('formRecordar').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const r = await api.llamar('agenda.frase', $('recFrase').value);
+  if (!r.ok) return ui.mostrarError(r.error);
+  $('recFrase').value = '';
+  ui.añadirMensaje('sistema', `⏰ Te lo recordaré: ${hora(r.recordatorio.cuando)} · ${r.recordatorio.texto}`);
+  pintarRecordatorios();
+});
+
+// Ideas de vídeos
+async function pintarIdeas() {
+  const d = await api.llamar('ideas.lista');
+  const cont = $('listaIdeas');
+  if (!d?.ideas?.length) return vacio(cont, 'Aún no hay ideas. Pulsa el botón o espera a la rutina de las 10:00.');
+  cont.replaceChildren(...d.ideas.map((x) => {
+    const c = el('div', 'tarjeta');
+    c.append(el('div', 'tarea-cab', x.titulo, { dir: 'auto' }), el('div', 'meta', `Gancho: ${x.gancho}`, { dir: 'auto' }));
+    c.append(boton('🎬 Crear este vídeo', (ev) => bloquear(ev, async () => {
+      ui.añadirMensaje('sistema', `Creando el vídeo «${x.titulo}» (unos minutos). Quedará en Por revisar.`);
+      const r = await api.llamar('video.crearTema', `${x.titulo}. ${x.tema}`);
+      if (!r || r.ok === false) return ui.mostrarError(r?.error || 'No se pudo crear');
+      ui.añadirMensaje('sistema', 'Vídeo listo en REDES → Por revisar.');
+      pintarRedes();
+    }), 'mini'));
+    return c;
+  }));
+}
+$('btnIdeas').addEventListener('click', (ev) => bloquear(ev, async () => {
+  ui.añadirMensaje('sistema', 'Leyendo las noticias de hoy y pensando ideas…');
+  const r = await api.llamar('ideas.generar');
+  if (!r.ok) return ui.mostrarError(r.error);
+  pintarIdeas();
+}));
+
 async function pintarServicios() {
+  pintarConfig();
   const s = await api.llamar('servicios.estado');
   const nombres = { ollama: 'Modelo local', gemini: 'Gemini (gratis)', whisper: 'Oído (Whisper)', correo: 'Correo', n8n: 'n8n', claude: 'Claude', claudeCode: 'Manos (Claude Code)', voz: 'Voz', ntfy: 'Móvil (ntfy)', twilio: 'Llamadas' };
   $('servicios').replaceChildren(...Object.entries(s).map(([k, v]) => {
@@ -806,6 +870,7 @@ function alEvento({ tipo, datos }) {
       if (confirmando && confirmando.id === datos.id) { confirmando = null; $('capaConfirmar').classList.add('oculto'); mostrarConfirmacion(); }
       break;
     case 'rutinas': pintarRutinas(datos); break;
+    case 'recordatorio': ui.añadirMensaje('sistema', `⏰ Recordatorio: ${datos.texto}`); pintarRecordatorios(); break;
     case 'habilidades': pintarHabilidades(); break;
     case 'progreso': $('transcripcion').textContent = datos; break;
     case 'sistema': ui.añadirMensaje('sistema', datos); break;

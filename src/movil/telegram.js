@@ -47,6 +47,8 @@ const AYUDA = [
   '/pedidos – pedidos por confirmar (comprar en CJ)',
   '/revisar – vídeos esperando tu aprobación',
   '/ventas – ventas, anuncios y beneficio',
+  '/recordar mañana 10:00 llamar al proveedor – recordatorio (también «en 30 min …», «25/11 18:30 …», «… cada día»)',
+  '/agenda – tus próximos recordatorios',
   '/ayuda – esta ayuda',
 ].join('\n');
 
@@ -54,6 +56,15 @@ async function comando(texto) {
   const a = acciones;
   const [cmd] = texto.trim().split(/\s+/);
   if (cmd === '/start' || cmd === '/ayuda' || cmd === '/help') return enviar(AYUDA);
+  if (cmd === '/recordar') {
+    if (!a.recordar) return enviar('La agenda no está disponible.');
+    const r = await a.recordar(texto.trim().slice(cmd.length).trim());
+    return enviar(r.ok ? `⏰ Te lo recordaré el ${new Date(r.recordatorio.cuando).toLocaleString('es-ES', { weekday: 'long', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })}: ${r.recordatorio.texto}${r.recordatorio.repetir !== 'no' ? ` (se repite: ${r.recordatorio.repetir})` : ''}` : `✘ ${r.error}`);
+  }
+  if (cmd === '/agenda') {
+    const l = a.agenda ? await a.agenda() : [];
+    return enviar(l.length ? `📅 Próximos recordatorios:\n${l.slice(0, 15).map((x) => `• ${new Date(x.cuando).toLocaleString('es-ES', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })} · ${x.texto}`).join('\n')}` : 'No tienes recordatorios. Crea uno con /recordar');
+  }
   if (cmd === '/ventas') { const r = await a.informe(); return enviar(r.ok ? `📊 ${r.resumen}` : `✘ ${r.error}`); }
   if (cmd === '/pedidos') {
     const lista = (await a.pedidos()).filter((p) => p.estado === 'por_confirmar');
