@@ -386,10 +386,10 @@ const ACCIONES = {
   'tienda.elegirTienda': (id) => tiendas.elegir(String(id || '')),
   'tienda.agregarTienda': async (datos) => {
     const d = datos || {};
-    const r = tiendas.agregar({ nombre: d.nombre, dominio: d.dominio, token: d.token, tipo: d.tipo });
+    const r = tiendas.agregar({ nombre: d.nombre, dominio: d.dominio, token: d.token, clientId: d.clientId, secreto: d.secreto, tipo: d.tipo });
     if (!r.ok) return r;
     tiendas.elegir(r.tienda.id);
-    if (!tiendas.conectada(r.tienda.id)) return { ...r, aviso: 'Tienda guardada, pero falta su token' };
+    if (!tiendas.conectada(r.tienda.id)) return { ...r, aviso: 'Tienda guardada, pero falta el ID de cliente y la clave secreta de su app' };
     const p = await tiendas.conTienda(r.tienda.id, () => tiendaShopify.probarTienda());
     registro.anotar({ origen: 'tienda', accion: `añadir tienda ${r.tienda.dominio} (${r.tienda.tipo})`, decision: p.ok ? 'hecho' : 'fallo', motivo: p.error });
     return p.ok ? { ...r, nombreShopify: p.nombre } : { ...r, aviso: `Guardada, pero Shopify no responde: ${p.error}` };

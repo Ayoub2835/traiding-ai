@@ -614,12 +614,12 @@ function pintarTiendas(s) {
   }
   cont.replaceChildren(fila);
 }
-$('ntCancelar').addEventListener('click', () => { $('formNuevaTienda').classList.add('oculto'); $('ntToken').value = ''; });
+$('ntCancelar').addEventListener('click', () => { $('formNuevaTienda').classList.add('oculto'); $('ntToken').value = ''; $('ntSecreto').value = ''; });
 $('formNuevaTienda').addEventListener('submit', (e) => {
   e.preventDefault();
   bloquear({ target: e.target.querySelector('button') }, async () => {
-    const r = await api.llamar('tienda.agregarTienda', { nombre: $('ntNombre').value.trim(), dominio: $('ntDominio').value.trim(), token: $('ntToken').value.trim(), tipo: $('ntTipo').value });
-    $('ntToken').value = '';
+    const r = await api.llamar('tienda.agregarTienda', { nombre: $('ntNombre').value.trim(), dominio: $('ntDominio').value.trim(), token: $('ntToken').value.trim(), clientId: $('ntClientId').value.trim(), secreto: $('ntSecreto').value.trim(), tipo: $('ntTipo').value });
+    $('ntToken').value = ''; $('ntSecreto').value = '';
     if (!r.ok) return ui.mostrarError(r.error);
     $('formNuevaTienda').classList.add('oculto');
     $('ntNombre').value = ''; $('ntDominio').value = '';

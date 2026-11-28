@@ -149,7 +149,9 @@
         <form id="formNuevaTienda" class="td-form oculto" autocomplete="off">
           <input id="ntNombre" type="text" dir="auto" maxlength="40" placeholder="Nombre (para ti): p. ej. Tienda mascotas">
           <input id="ntDominio" type="text" maxlength="80" placeholder="Dirección: mitienda.myshopify.com">
-          <input id="ntToken" type="password" maxlength="200" placeholder="Token de la app de Shopify (shpat_…)">
+          <input id="ntClientId" type="text" maxlength="200" placeholder="ID de cliente (Client ID) de tu app en dev.shopify.com">
+          <input id="ntSecreto" type="password" maxlength="200" placeholder="Clave secreta (Client secret) de tu app">
+          <input id="ntToken" type="password" maxlength="200" placeholder="…o token antiguo shpat_ (solo si ya lo tienes)">
           <select id="ntTipo"><option value="dropshipping">Con dropshipping (productos de CJ)</option><option value="stock">Sin dropshipping (mis productos, los envío yo)</option></select>
           <div class="ajuste-botones"><button type="submit">Guardar tienda</button><button type="button" id="ntCancelar">Cancelar</button></div>
         </form>

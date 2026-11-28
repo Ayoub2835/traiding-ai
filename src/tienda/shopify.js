@@ -9,14 +9,16 @@ const investigar = require('./investigar');
 
 const VERSION = '2026-10';
 // Tienda en uso (pestaña TIENDA, o la que recorre una rutina).
-const url = () => {
-  const { dominio: tienda, token } = require('./tiendas').credenciales();
-  if (!tienda || !token) throw new Error('Falta conectar esta tienda de Shopify (TIENDA → ＋ Añadir tienda, o Ajustes → Claves → SHOPIFY_TIENDA y SHOPIFY_TOKEN)');
+const url = async () => {
+  const tiendas = require('./tiendas');
+  const { dominio: tienda } = tiendas.credenciales();
+  if (!tiendas.conectada()) throw new Error('Falta conectar esta tienda de Shopify (TIENDA → ＋ Añadir tienda)');
+  const token = await tiendas.acceso();
   return { tienda, token, api: process.env.JARVIS_SHOPIFY_BASE ? `${process.env.JARVIS_SHOPIFY_BASE}/admin/api/${VERSION}/graphql.json` : `https://${tienda}/admin/api/${VERSION}/graphql.json` };
 };
 
 async function graphql(query, variables) {
-  const { api, token } = url();
+  const { api, token } = await url();
   const r = await pedir(api, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Shopify-Access-Token': token }, body: JSON.stringify({ query, variables }) }, 60);
   if (!r.ok) throw new Error(`Shopify: ${r.error}`);
   if (r.datos?.errors?.length) throw new Error(`Shopify: ${r.datos.errors.map((e) => e.message).join('; ')}`);
@@ -73,7 +75,7 @@ async function crearProducto({ pensar } = {}) {
   const p = estado.elegido;
   if (!p) return { ok: false, error: 'Primero elige un producto' };
   try {
-    const { tienda } = url();
+    const { tienda } = await url();
     const t = await textos(p, pensar);
     const d = await graphql(PRODUCT_SET, {
       synchronous: true,

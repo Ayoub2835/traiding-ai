@@ -43,7 +43,8 @@ test('cada tienda usa sus credenciales y sus datos, sin mezclarse', async () => 
   investigar.escribir({ elegido: { pid: 'A' } });
   await tiendas.conTienda('mascotases', async () => {
     await new Promise((r) => setTimeout(r, 5)); // también a través de los await
-    assert.deepStrictEqual(tiendas.credenciales(), { dominio: 'mascotas-es.myshopify.com', token: 'shpat_mascotas' });
+    const c = tiendas.credenciales();
+    assert.deepStrictEqual([c.dominio, c.token], ['mascotas-es.myshopify.com', 'shpat_mascotas']);
     assert.strictEqual(investigar.leer().elegido, undefined);
     investigar.escribir({ elegido: { pid: 'B' } });
   });
@@ -98,4 +99,24 @@ test('quitar una tienda borra su token y vuelve a la principal', () => {
   assert.strictEqual(claves.obtener('SHOPIFY_TOKEN_MASCOTASES'), '');
   assert.strictEqual(tiendas.actualId(), 'principal');
   assert.strictEqual(tiendas.elegir('nada').ok, false);
+});
+
+test('apps nuevas de dev.shopify.com: pide el token con ID y clave, lo reutiliza 24 h y no lo guarda en disco', async () => {
+  const r = tiendas.agregar({ nombre: 'Nueva', dominio: 'jji06e-kf.myshopify.com', clientId: 'cid123', secreto: 'sec456', tipo: 'dropshipping' });
+  assert.ok(r.ok, r.error);
+  assert.ok(tiendas.conectada(r.tienda.id), 'con ID y clave cuenta como conectada');
+  const llamadas = [];
+  const pedir = async (url, o) => { llamadas.push({ url, o }); return { ok: true, datos: { access_token: 'shpat_temporal', scope: 'read_orders', expires_in: 86399 } }; };
+  assert.strictEqual(await tiendas.acceso(r.tienda.id, { dep: { pedir } }), 'shpat_temporal');
+  assert.strictEqual(await tiendas.acceso(r.tienda.id, { dep: { pedir } }), 'shpat_temporal');
+  assert.strictEqual(llamadas.length, 1, 'el token se reutiliza mientras no caduque');
+  assert.strictEqual(llamadas[0].url, 'https://jji06e-kf.myshopify.com/admin/oauth/access_token');
+  assert.strictEqual(llamadas[0].o.method, 'POST');
+  assert.deepStrictEqual(Object.fromEntries(new URLSearchParams(llamadas[0].o.body)), { grant_type: 'client_credentials', client_id: 'cid123', client_secret: 'sec456' });
+  assert.ok(!fs.readFileSync(rutas.datos('tiendas.json'), 'utf8').includes('sec456'), 'la clave secreta nunca va al JSON');
+  const otra = tiendas.agregar({ nombre: 'Otra', dominio: 'otra-es.myshopify.com', clientId: 'x', secreto: 'y' });
+  await assert.rejects(tiendas.acceso(otra.tienda.id, { dep: { pedir: async () => ({ ok: false, datos: { error: 'shop_not_permitted' } }) } }), /misma organización/);
+  assert.ok(tiendas.quitar(otra.tienda.id).ok);
+  assert.ok(tiendas.quitar(r.tienda.id).ok);
+  assert.strictEqual(claves.obtener(tiendas.nombres(r.tienda.id).secreto), '');
 });
